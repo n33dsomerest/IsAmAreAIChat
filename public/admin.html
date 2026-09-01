@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - IsAmAre AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="admin.css">
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" class="login-overlay">
+        <div class="login-box">
+            <h2>Admin Login</h2>
+            <div class="input-group">
+                <label>Username</label>
+                <input type="text" id="admin-username" placeholder="Enter username">
+            </div>
+            <div class="input-group">
+                <label>Password</label>
+                <input type="password" id="admin-password" placeholder="Enter password">
+            </div>
+            <p id="login-error" class="login-error"></p>
+            <button id="login-btn" class="primary-btn" style="width: 100%; justify-content: center;">Login</button>
+        </div>
+    </div>
+
+    <div class="app-container admin-container" id="admin-content" style="display: none;">
+        <header class="chat-header">
+            <h1 class="header-title">IsAmAre <span class="gradient-text">Admin</span></h1>
+            <a href="/" class="secondary-btn" style="text-decoration: none;">กลับไปหน้าแชท</a>
+        </header>
+
+        <main class="admin-main">
+            <div class="stats-overview">
+                <div class="stat-card">
+                    <h3>Total Users (IPs)</h3>
+                    <div class="stat-value" id="total-users">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Requests</h3>
+                    <div class="stat-value" id="total-requests">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Tokens</h3>
+                    <div class="stat-value" id="total-tokens">-</div>
+                </div>
+            </div>
+
+            <section class="charts-grid">
+                <div class="chart-card">
+                    <h3>Top 10 Users by Tokens</h3>
+                    <div class="chart-canvas-wrap"><canvas id="top-users-chart"></canvas></div>
+                </div>
+                <div class="chart-card">
+                    <h3>Token Distribution</h3>
+                    <div class="chart-canvas-wrap"><canvas id="token-dist-chart"></canvas></div>
+                </div>
+                <div class="chart-card chart-card-wide">
+                    <h3>Requests vs Tokens (per user)</h3>
+                    <div class="chart-canvas-wrap"><canvas id="scatter-chart"></canvas></div>
+                </div>
+                <div class="chart-card chart-card-wide">
+                    <h3>Daily Activity (last 14 days)</h3>
+                    <div class="chart-canvas-wrap"><canvas id="daily-activity-chart"></canvas></div>
+                </div>
+            </section>
+
+            <div class="table-container">
+                <h2>Usage Logs by IP</h2>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Username</th>
+                            <th>IP Address</th>
+                            <th>Requests</th>
+                            <th>Tokens Used</th>
+                            <th>Last Active</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stats-table-body">
+                        <tr><td colspan="4" style="text-align: center;">Loading data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </main>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="admin.js"></script>
+</body>
+</html>
