@@ -1159,7 +1159,7 @@
             if (error.name === 'AbortError') {
                 appendMessageToUI('bot', '**⚠️ หยุดการสร้างคำตอบแล้ว**');
             } else {
-                appendMessageToUI('bot', '**❌ Error:** เกิดข้อผิดพลาดในการเชื่อมต่อ\n\n`' + error.message + '`\n\nกรุณาตรวจสอบ API Key และการเชื่อมต่ออินเทอร์เน็ตของคุณ');
+                appendMessageToUI('bot', '**❌ Error:** เกิดข้อผิดพลาดในการเชื่อมต่อ\n\n`' + error.message + '`\n\nกรุณาเปลี่ยนโมเดล หรือตรวจสอบการเชื่อมต่ออินเทอร์เน็ตของคุณ');
             }
         } finally {
             isGenerating = false;
