@@ -10,8 +10,7 @@ const CONFIG = {
     AVAILABLE_MODELS: [
         { id: 'minimax/minimax-m3:free', label: 'MiniMax M3', tag: 'On' },
         { id: 'openrouter/free', label: 'Auto Model', tag: 'On' },
-        { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 3 Super', tag: 'On' },
-        { id: 'z-ai/glm-5.2:free', label: 'GLM 5.2', tag: 'On' }
+        { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 3 Super', tag: 'On' }
     ],
 
     // ตั้งค่า URL ของ OpenRouter API
