@@ -229,6 +229,7 @@ h1, h2, h3, h4 {
 }
 
 .user-info {
+    position: relative;
     display: flex;
     align-items: center;
     gap: 12px;
@@ -240,6 +241,61 @@ h1, h2, h3, h4 {
 
 .user-info:hover {
     background-color: var(--bg-surface);
+}
+
+.user-stats-popover {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 16px;
+    width: 220px;
+    background-color: var(--bg-panel);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+    z-index: 100;
+    overflow: hidden;
+    transform-origin: bottom left;
+    transition: all 0.2s ease;
+}
+
+.user-stats-popover.hidden {
+    opacity: 0;
+    transform: scale(0.95);
+    pointer-events: none;
+}
+
+.user-stats-popover .stats-header {
+    padding: 10px 12px;
+    background-color: rgba(255,255,255,0.05);
+    border-bottom: 1px solid var(--border-color);
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.user-stats-popover .stats-body {
+    padding: 12px;
+}
+
+.user-stats-popover .stat-item {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+}
+
+.user-stats-popover .stat-item:last-child {
+    margin-bottom: 0;
+}
+
+.user-stats-popover .stat-label {
+    color: var(--text-muted);
+}
+
+.user-stats-popover .stat-value {
+    color: var(--accent-color);
+    font-weight: 500;
+    font-family: monospace;
 }
 
 .avatar-placeholder {

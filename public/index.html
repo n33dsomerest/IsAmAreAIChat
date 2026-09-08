@@ -47,9 +47,24 @@
             </div>
             
             <div class="sidebar-footer">
-                <div class="user-info">
+                <div class="user-info" id="user-info-btn">
                     <div class="avatar-placeholder" id="display-user-avatar">U</div>
                     <span class="user-name" id="display-user-name">Local User</span>
+                    
+                    <!-- Stats Popover -->
+                    <div id="user-stats-popover" class="user-stats-popover hidden">
+                        <div class="stats-header">การใช้งานของคุณ</div>
+                        <div class="stats-body">
+                            <div class="stat-item">
+                                <span class="stat-label">Requests:</span>
+                                <span class="stat-value" id="stat-requests">-</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Tokens:</span>
+                                <span class="stat-value" id="stat-tokens">-</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </aside>

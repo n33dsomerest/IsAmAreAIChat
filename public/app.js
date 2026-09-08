@@ -42,7 +42,12 @@
     const onboardingNameInput = document.getElementById('onboarding-name-input');
     const displayUserName = document.getElementById('display-user-name');
     const displayUserAvatar = document.getElementById('display-user-avatar');
-
+    
+    // User Stats DOM
+    const userInfoBtn = document.getElementById('user-info-btn');
+    const userStatsPopover = document.getElementById('user-stats-popover');
+    const statRequests = document.getElementById('stat-requests');
+    const statTokens = document.getElementById('stat-tokens');
     // State
     let sessions = [];
     let currentSessionId = null;
@@ -215,10 +220,13 @@
             }
         });
 
-        // Close dropdown when clicking outside
+        // Close dropdowns when clicking outside
         document.addEventListener('click', function(e) {
             if (!modelSelector.contains(e.target)) {
                 modelSelector.classList.remove('open');
+            }
+            if (userInfoBtn && userStatsPopover && !userInfoBtn.contains(e.target)) {
+                userStatsPopover.classList.add('hidden');
             }
         });
 
@@ -238,6 +246,38 @@
 
         // Export
         if (exportBtn) exportBtn.addEventListener('click', exportChat);
+
+        // User Stats
+        if (userInfoBtn && userStatsPopover) {
+            userInfoBtn.addEventListener('click', async function(e) {
+                // If it's already open, just close it
+                if (!userStatsPopover.classList.contains('hidden')) {
+                    userStatsPopover.classList.add('hidden');
+                    return;
+                }
+                
+                // Show popover and indicate loading
+                userStatsPopover.classList.remove('hidden');
+                statRequests.textContent = '...';
+                statTokens.textContent = '...';
+                
+                try {
+                    const res = await fetch('/api/user-stats?user=' + encodeURIComponent(userName || 'Local User'));
+                    if (res.ok) {
+                        const data = await res.json();
+                        statRequests.textContent = data.requests_count ? data.requests_count.toLocaleString() : '0';
+                        statTokens.textContent = data.tokens_used ? data.tokens_used.toLocaleString() : '0';
+                    } else {
+                        statRequests.textContent = 'Error';
+                        statTokens.textContent = 'Error';
+                    }
+                } catch (error) {
+                    console.error('Failed to load user stats', error);
+                    statRequests.textContent = 'Error';
+                    statTokens.textContent = 'Error';
+                }
+            });
+        }
     }
 
     // --- Onboarding ---
