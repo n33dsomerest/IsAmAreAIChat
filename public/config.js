@@ -9,8 +9,8 @@ const CONFIG = {
     // รายการโมเดลที่สามารถเลือกใช้ได้
     AVAILABLE_MODELS: [
         { id: 'openrouter/free', label: 'Auto Router', tag: 'On', provider: 'openrouter', icon: 'lobehub' },
-        { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA Nemotron 3 Super', tag: 'On', provider: 'openrouter', icon: 'nvidia' },
-        
+        { id: 'nvidia/nemotron-3.5-lightning:free', label: 'NVIDIA Nemotron 3.5 lightning', tag: 'On', provider: 'openrouter', icon: 'nvidia' },
+
         // OKMD Models
         { id: 'claude-sonnet-5', label: 'Claude 5 Sonnet', tag: 'OKMD', provider: 'okmd', icon: 'claude' },
         { id: 'claude-sonnet-4.6', label: 'Claude 4.6 Sonnet', tag: 'OKMD', provider: 'okmd', icon: 'claude' },
