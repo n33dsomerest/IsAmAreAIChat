@@ -11,7 +11,7 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
 module.exports = async function handler(req, res) {
     if (req.method !== 'POST') return res.status(405).send('Method Not Allowed');
 
-    const { model, messages, stream, userName } = req.body;
+    const { model, messages, stream, userName, provider } = req.body;
     
     // Extract IP address again
     const clientIp = req.headers['x-forwarded-for'] || req.socket?.remoteAddress || 'unknown';
@@ -20,16 +20,29 @@ module.exports = async function handler(req, res) {
     const trackingUser = userName || 'Anonymous';
 
     try {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        let apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        let apiKey = process.env.OPENROUTER_API_KEY;
+        let extraHeaders = {
+            'HTTP-Referer': 'https://isamare-ai.vercel.app',
+            'X-Title': 'IsAmAre AI Chat',
+        };
+        let bodyPayload = { model, messages, stream, include_usage: true };
+
+        if (provider === 'okmd') {
+            apiUrl = 'https://gen.ai.kku.ac.th/okmd/api/v1';
+            apiKey = process.env.PLAYGROUND_API_KEY;
+            extraHeaders = {};
+            bodyPayload = { model, messages, stream }; // Don't send OpenRouter specific flags
+        }
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+                'Authorization': `Bearer ${apiKey}`,
                 'Content-Type': 'application/json',
-                'HTTP-Referer': 'https://isamare-ai.vercel.app',
-                'X-Title': 'IsAmAre AI Chat',
+                ...extraHeaders
             },
-            // include_usage: true forces OpenRouter to send token stats in the final SSE chunk
-            body: JSON.stringify({ model, messages, stream, include_usage: true })
+            body: JSON.stringify(bodyPayload)
         });
 
         if (!response.ok) {

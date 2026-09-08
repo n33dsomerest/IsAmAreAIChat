@@ -582,6 +582,44 @@ h1, h2, h3, h4 {
     font-weight: 600;
 }
 
+.model-dropdown-search {
+    padding: 0 8px 8px 8px;
+}
+
+.model-search-input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid var(--border-color);
+    padding: 8px 12px;
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+}
+
+.model-search-input:focus {
+    border-color: var(--border-focus);
+    outline: none;
+}
+
+.model-dropdown-list {
+    max-height: 350px;
+    overflow-y: auto;
+    padding-right: 2px; /* For scrollbar */
+}
+
+/* Custom scrollbar for model list */
+.model-dropdown-list::-webkit-scrollbar {
+    width: 4px;
+}
+.model-dropdown-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+.model-dropdown-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: var(--radius-full);
+}
+
 .model-option {
     display: flex;
     align-items: center;

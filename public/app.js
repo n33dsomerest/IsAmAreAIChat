@@ -198,7 +198,21 @@
         // Model selector toggle
         modelSelectorBtn.addEventListener('click', function(e) {
             e.stopPropagation();
+            if (!modelSelector.classList.contains('open')) {
+                // Opening - clear search and show all
+                var searchInput = document.querySelector('.model-search-input');
+                if (searchInput) {
+                    searchInput.value = '';
+                }
+                renderModelOptions('');
+            }
             modelSelector.classList.toggle('open');
+            if (modelSelector.classList.contains('open')) {
+                var searchInput = document.querySelector('.model-search-input');
+                if (searchInput) {
+                    setTimeout(function() { searchInput.focus(); }, 100);
+                }
+            }
         });
 
         // Close dropdown when clicking outside
@@ -366,13 +380,70 @@
         header.textContent = 'เลือกโมเดล AI';
         modelDropdown.appendChild(header);
 
+        var searchContainer = document.createElement('div');
+        searchContainer.className = 'model-dropdown-search';
+        
+        var searchInput = document.createElement('input');
+        searchInput.type = 'text';
+        searchInput.className = 'model-search-input';
+        searchInput.placeholder = 'ค้นหาโมเดล...';
+        searchInput.addEventListener('click', function(e) {
+            e.stopPropagation();
+        });
+        searchInput.addEventListener('input', function(e) {
+            renderModelOptions(e.target.value);
+        });
+        
+        searchContainer.appendChild(searchInput);
+        modelDropdown.appendChild(searchContainer);
+
+        var listContainer = document.createElement('div');
+        listContainer.className = 'model-dropdown-list';
+        listContainer.id = 'model-dropdown-list';
+        modelDropdown.appendChild(listContainer);
+
+        renderModelOptions('');
+    }
+
+    function renderModelOptions(filterText) {
+        var listContainer = document.getElementById('model-dropdown-list');
+        if (!listContainer) return;
+        
+        listContainer.innerHTML = '';
+        var lowerFilter = (filterText || '').toLowerCase();
+
         CONFIG.AVAILABLE_MODELS.forEach(function(model, index) {
+            if (lowerFilter && !model.label.toLowerCase().includes(lowerFilter) && !model.id.toLowerCase().includes(lowerFilter)) {
+                return;
+            }
+
             var option = document.createElement('button');
             option.className = 'model-option' + (model.id === selectedModel ? ' active' : '');
 
             var iconDiv = document.createElement('div');
             iconDiv.className = 'model-option-icon';
-            iconDiv.textContent = modelIcons[index % modelIcons.length];
+            if (model.icon) {
+                var img = document.createElement('img');
+                var baseUrl = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/';
+                img.src = baseUrl + model.icon + '-color.svg';
+                img.style.width = '20px';
+                img.style.height = '20px';
+                img.style.objectFit = 'contain';
+                
+                var tryMono = false;
+                img.onerror = function() {
+                    if (!tryMono) {
+                        tryMono = true;
+                        img.src = baseUrl + model.icon + '.svg';
+                    } else {
+                        iconDiv.innerHTML = '';
+                        iconDiv.textContent = modelIcons[index % modelIcons.length];
+                    }
+                };
+                iconDiv.appendChild(img);
+            } else {
+                iconDiv.textContent = modelIcons[index % modelIcons.length];
+            }
 
             var infoDiv = document.createElement('div');
             infoDiv.className = 'model-option-info';
@@ -396,11 +467,12 @@
             option.appendChild(infoDiv);
             option.appendChild(checkSvg);
 
-            option.addEventListener('click', function() {
+            option.addEventListener('click', function(e) {
+                e.stopPropagation();
                 selectModel(model);
             });
 
-            modelDropdown.appendChild(option);
+            listContainer.appendChild(option);
         });
     }
 
@@ -411,8 +483,32 @@
         // Update button label
         modelSelectorLabel.textContent = model.label;
 
-        // Re-render dropdown to update active state
-        renderModelDropdown();
+        // Update button icon
+        var btnIcon = document.querySelector('.model-selector-btn .model-selector-icon') || document.querySelector('.model-selector-btn img.model-selector-icon');
+        if (btnIcon && model.icon) {
+            var img = document.createElement('img');
+            var baseUrl = 'https://unpkg.com/@lobehub/icons-static-svg@latest/icons/';
+            img.src = baseUrl + model.icon + '-color.svg';
+            img.className = 'model-selector-icon';
+            img.style.width = '16px';
+            img.style.height = '16px';
+            img.style.objectFit = 'contain';
+            
+            var tryMono = false;
+            img.onerror = function() {
+                if (!tryMono) {
+                    tryMono = true;
+                    img.src = baseUrl + model.icon + '.svg';
+                }
+            };
+            
+            // Keep the original SVG as a fallback if we had it, but simpler is just not worry
+            btnIcon.parentNode.replaceChild(img, btnIcon);
+        }
+
+        // Re-render options to update active state without losing search
+        var searchInput = document.querySelector('.model-search-input');
+        renderModelOptions(searchInput ? searchInput.value : '');
 
         // Close dropdown
         modelSelector.classList.remove('open');
@@ -1072,6 +1168,9 @@
 
             currentAbortController = new AbortController();
 
+            var selectedModelInfo = CONFIG.AVAILABLE_MODELS.find(function(m) { return m.id === selectedModel; });
+            var provider = selectedModelInfo ? selectedModelInfo.provider : 'openrouter';
+
             var response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
@@ -1079,6 +1178,7 @@
                 },
                 body: JSON.stringify({
                     model: selectedModel,
+                    provider: provider,
                     messages: apiMessages,
                     stream: true,
                     userName: userName // Send username for tracking
