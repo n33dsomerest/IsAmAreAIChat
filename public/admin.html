@@ -4,90 +4,707 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin Dashboard - IsAmAre AI</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            /* Modern Slate Dark Theme */
+            --bg-main: #0f172a;
+            --bg-surface: rgba(30, 41, 59, 0.7);
+            --bg-hover: rgba(51, 65, 85, 0.8);
+            --bg-panel: #1e293b;
+            
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-muted: #94a3b8;
+            
+            --accent-primary: #38bdf8;
+            --accent-secondary: #818cf8;
+            --accent-gradient: linear-gradient(135deg, #38bdf8, #818cf8);
+            
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-focus: rgba(56, 189, 248, 0.5);
+            
+            --radius-md: 12px;
+            --radius-lg: 20px;
+            --radius-full: 9999px;
+            
+            --font-sans: 'Inter', sans-serif;
+            --font-display: 'Outfit', sans-serif;
+            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            
+            --shadow-glow: 0 0 20px rgba(56, 189, 248, 0.15);
+            --shadow-card: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-main);
+            color: var(--text-primary);
+            min-height: 100vh;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(56, 189, 248, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 85% 30%, rgba(129, 140, 248, 0.05) 0%, transparent 50%);
+            background-attachment: fixed;
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* Typography */
+        h1, h2, h3 { font-family: var(--font-display); }
+        .gradient-text {
+            background: var(--accent-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Buttons */
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+            padding: 10px 20px; border-radius: var(--radius-full);
+            font-size: 0.95rem; font-weight: 500; cursor: pointer;
+            transition: all 0.2s ease; border: none; outline: none;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background: var(--accent-gradient); color: white;
+            box-shadow: 0 4px 12px rgba(56, 189, 248, 0.25);
+        }
+        .btn-primary:hover {
+            box-shadow: 0 6px 16px rgba(56, 189, 248, 0.4);
+            transform: translateY(-1px);
+        }
+        .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        
+        .btn-outline {
+            background: rgba(255,255,255,0.03); border: 1px solid var(--border-color);
+            color: var(--text-primary); backdrop-filter: blur(10px);
+        }
+        .btn-outline:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); }
+
+        /* Login Overlay */
+        .login-overlay {
+            position: fixed; inset: 0; background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(16px); display: flex; align-items: center; justify-content: center;
+            z-index: 9999; animation: fadeIn 0.3s ease;
+        }
+        .login-box {
+            background: var(--bg-panel); border: 1px solid var(--border-color);
+            border-radius: var(--radius-lg); padding: 40px; width: 90%; max-width: 420px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative; overflow: hidden;
+        }
+        .login-box::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+            background: var(--accent-gradient);
+        }
+        .login-header { text-align: center; margin-bottom: 32px; }
+        .login-header svg { color: var(--accent-primary); margin-bottom: 16px; }
+        .login-header h2 { font-size: 1.75rem; font-weight: 700; margin-bottom: 8px; }
+        .login-header p { color: var(--text-muted); font-size: 0.95rem; }
+
+        .input-group { margin-bottom: 20px; text-align: left; }
+        .input-group label {
+            display: block; font-size: 0.85rem; font-weight: 500; color: var(--text-secondary);
+            margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;
+        }
+        .input-group input {
+            width: 100%; background: rgba(0, 0, 0, 0.2); border: 1px solid var(--border-color);
+            padding: 14px 16px; border-radius: var(--radius-md); color: var(--text-primary);
+            font-family: var(--font-sans); font-size: 1rem; transition: all 0.2s;
+        }
+        .input-group input:focus { border-color: var(--accent-primary); box-shadow: 0 0 0 2px rgba(56,189,248,0.2); outline: none; }
+        .login-error { color: #f87171; font-size: 0.85rem; margin-bottom: 20px; text-align: center; min-height: 1.2em; font-weight: 500; }
+
+        /* Dashboard Layout */
+        .admin-container {
+            display: flex; flex-direction: column; height: 100vh; overflow-y: auto;
+        }
+        
+        .topbar {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(16px);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
+        }
+        .topbar-brand { display: flex; align-items: center; gap: 12px; }
+        .topbar-brand h1 { font-size: 1.25rem; font-weight: 700; }
+        .badge {
+            background: rgba(129, 140, 248, 0.15); color: #818cf8;
+            padding: 4px 10px; border-radius: var(--radius-full); font-size: 0.75rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.05em; border: 1px solid rgba(129,140,248,0.3);
+        }
+
+        .admin-main { max-width: 1200px; width: 100%; margin: 0 auto; padding: 40px 24px; }
+
+        /* Stats Cards */
+        .stats-overview {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px; margin-bottom: 40px;
+        }
+        .stat-card {
+            background: var(--bg-surface); backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+            padding: 24px; display: flex; align-items: center; gap: 20px;
+            box-shadow: var(--shadow-card); transition: transform 0.3s ease, border-color 0.3s ease;
+        }
+        .stat-card:hover { transform: translateY(-4px); border-color: rgba(255,255,255,0.15); }
+        .stat-icon {
+            width: 60px; height: 60px; border-radius: 16px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+        }
+        .stat-icon.users { background: rgba(56, 189, 248, 0.1); color: #38bdf8; }
+        .stat-icon.requests { background: rgba(167, 139, 250, 0.1); color: #a78bfa; }
+        .stat-icon.tokens { background: rgba(52, 211, 153, 0.1); color: #34d399; }
+        
+        .stat-info { flex: 1; }
+        .stat-info h3 { color: var(--text-muted); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; font-weight: 600;}
+        .stat-value { font-size: 2.25rem; font-weight: 700; color: var(--text-primary); line-height: 1.2; font-family: var(--font-display); }
+        .stat-sub { font-size: 0.85rem; color: #34d399; margin-top: 8px; font-weight: 500; display: flex; align-items: center; gap: 4px; }
+        .stat-sub svg { width: 14px; height: 14px; }
+
+        /* Charts Section */
+        .charts-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 24px; margin-bottom: 40px;
+        }
+        .chart-card {
+            background: var(--bg-surface); backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+            padding: 24px; box-shadow: var(--shadow-card);
+        }
+        .chart-card-wide { grid-column: 1 / -1; }
+        .chart-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+        .chart-card h3 { color: var(--text-primary); font-size: 1.1rem; font-weight: 600; }
+        .chart-canvas-wrap { position: relative; width: 100%; height: 300px; }
+        
+        @media (max-width: 992px) { .charts-grid { grid-template-columns: 1fr; } }
+
+        /* Table Section */
+        .table-container {
+            background: var(--bg-surface); backdrop-filter: blur(12px);
+            border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-card); overflow: hidden; margin-bottom: 40px;
+        }
+        .table-header {
+            padding: 24px; border-bottom: 1px solid var(--border-color);
+            display: flex; align-items: center; gap: 12px;
+        }
+        .table-header h2 { font-size: 1.25rem; }
+        .table-wrapper { overflow-x: auto; }
+        .data-table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; }
+        .data-table th, .data-table td { padding: 16px 24px; border-bottom: 1px solid var(--border-color); }
+        .data-table th {
+            color: var(--text-muted); font-weight: 600; font-size: 0.75rem; text-transform: uppercase;
+            letter-spacing: 0.05em; background: rgba(0,0,0,0.2); white-space: nowrap;
+        }
+        .data-table tbody tr { transition: background 0.2s; }
+        .data-table tbody tr:hover { background: rgba(255,255,255,0.02); }
+        .data-table tbody tr:last-child td { border-bottom: none; }
+        
+        .user-cell { display: flex; align-items: center; gap: 12px; }
+        .user-avatar-mini {
+            width: 32px; height: 32px; border-radius: 50%; background: var(--bg-panel);
+            border: 1px solid var(--border-color); display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; font-weight: bold; color: var(--accent-primary); flex-shrink: 0;
+        }
+        
+        .status-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #34d399; margin-right: 6px; box-shadow: 0 0 8px rgba(52,211,153,0.6); }
+        
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    </style>
 </head>
 <body>
+
     <!-- Login Overlay -->
     <div id="login-overlay" class="login-overlay">
         <div class="login-box">
-            <h2>Admin Login</h2>
+            <div class="login-header">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+                <h2>Admin Access</h2>
+                <p>Sign in to view IsAmAre AI statistics</p>
+            </div>
             <div class="input-group">
                 <label>Username</label>
-                <input type="text" id="admin-username" placeholder="Enter username">
+                <input type="text" id="admin-username" placeholder="Enter admin username" autocomplete="off">
             </div>
             <div class="input-group">
                 <label>Password</label>
                 <input type="password" id="admin-password" placeholder="Enter password">
             </div>
             <p id="login-error" class="login-error"></p>
-            <button id="login-btn" class="primary-btn" style="width: 100%; justify-content: center;">Login</button>
+            <button id="login-btn" class="btn btn-primary" style="width: 100%;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+                Secure Login
+            </button>
         </div>
     </div>
 
-    <div class="app-container admin-container" id="admin-content" style="display: none;">
-        <header class="chat-header">
-            <h1 class="header-title">IsAmAre <span class="gradient-text">Admin</span></h1>
-            <a href="/" class="secondary-btn" style="text-decoration: none;">กลับไปหน้าแชท</a>
-        </header>
+    <!-- Main Admin Dashboard -->
+    <div class="admin-container" id="admin-content" style="display: none;">
+        
+        <!-- Top Navigation -->
+        <nav class="topbar">
+            <div class="topbar-brand">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="url(#logo-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="logo-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stop-color="#38bdf8" />
+                            <stop offset="100%" stop-color="#818cf8" />
+                        </linearGradient>
+                    </defs>
+                    <path d="M12 2a10 10 0 1 0 10 10H12V2z"></path><path d="M12 12 2.1 7.1"></path><path d="M12 12l9.9 4.9"></path>
+                </svg>
+                <h1>IsAmAre <span class="gradient-text">Dashboard</span></h1>
+                <span class="badge">Live</span>
+            </div>
+            <a href="/" class="btn btn-outline">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                Back to Chat
+            </a>
+        </nav>
 
         <main class="admin-main">
+            <!-- Stats Row -->
             <div class="stats-overview">
                 <div class="stat-card">
-                    <h3>Total Users (IPs)</h3>
-                    <div class="stat-value" id="total-users">-</div>
+                    <div class="stat-icon users">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Total Users (IPs)</h3>
+                        <div class="stat-value" id="total-users">-</div>
+                        <div class="stat-sub" id="today-users"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> Active Today: -</div>
+                    </div>
                 </div>
                 <div class="stat-card">
-                    <h3>Total Requests</h3>
-                    <div class="stat-value" id="total-requests">-</div>
+                    <div class="stat-icon requests">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Total Requests</h3>
+                        <div class="stat-value" id="total-requests">-</div>
+                    </div>
                 </div>
                 <div class="stat-card">
-                    <h3>Total Tokens</h3>
-                    <div class="stat-value" id="total-tokens">-</div>
+                    <div class="stat-icon tokens">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    </div>
+                    <div class="stat-info">
+                        <h3>Total Tokens</h3>
+                        <div class="stat-value" id="total-tokens">-</div>
+                    </div>
                 </div>
             </div>
 
+            <!-- Charts Grid -->
             <section class="charts-grid">
                 <div class="chart-card">
-                    <h3>Top 10 Users by Tokens</h3>
+                    <div class="chart-header"><h3>Top 10 Users by Tokens</h3></div>
                     <div class="chart-canvas-wrap"><canvas id="top-users-chart"></canvas></div>
                 </div>
                 <div class="chart-card">
-                    <h3>Token Distribution</h3>
+                    <div class="chart-header"><h3>Token Distribution</h3></div>
                     <div class="chart-canvas-wrap"><canvas id="token-dist-chart"></canvas></div>
                 </div>
                 <div class="chart-card chart-card-wide">
-                    <h3>Requests vs Tokens (per user)</h3>
-                    <div class="chart-canvas-wrap"><canvas id="scatter-chart"></canvas></div>
+                    <div class="chart-header"><h3>Requests vs Tokens (Per User)</h3></div>
+                    <div class="chart-canvas-wrap" style="height: 350px;"><canvas id="scatter-chart"></canvas></div>
                 </div>
                 <div class="chart-card chart-card-wide">
-                    <h3>Daily Activity (last 14 days)</h3>
-                    <div class="chart-canvas-wrap"><canvas id="daily-activity-chart"></canvas></div>
+                    <div class="chart-header"><h3>Daily Activity (Last 14 Days)</h3></div>
+                    <div class="chart-canvas-wrap" style="height: 350px;"><canvas id="daily-activity-chart"></canvas></div>
                 </div>
             </section>
 
+            <!-- Table -->
             <div class="table-container">
-                <h2>Usage Logs by IP</h2>
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>IP Address</th>
-                            <th>Requests</th>
-                            <th>Tokens Used</th>
-                            <th>Last Active</th>
-                        </tr>
-                    </thead>
-                    <tbody id="stats-table-body">
-                        <tr><td colspan="4" style="text-align: center;">Loading data...</td></tr>
-                    </tbody>
-                </table>
+                <div class="table-header">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                    <h2>Detailed Usage Logs</h2>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User / Identity</th>
+                                <th>IP Address</th>
+                                <th>API Requests</th>
+                                <th>Tokens Consumed</th>
+                                <th>Last Active</th>
+                            </tr>
+                        </thead>
+                        <tbody id="stats-table-body">
+                            <tr><td colspan="5" style="text-align: center; padding: 40px; color: var(--text-muted);">Loading data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
         </main>
     </div>
 
+    <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
-    <script src="admin.js"></script>
+    
+    <!-- Unified Admin Logic (Moved from admin.js) -->
+    <script>
+        document.addEventListener('DOMContentLoaded', checkLogin);
+
+        function checkLogin() {
+            const token = sessionStorage.getItem('admin_token');
+            if (token) {
+                document.getElementById('login-overlay').style.display = 'none';
+                document.getElementById('admin-content').style.display = 'flex';
+                fetchStats(token);
+            } else {
+                setupLoginForm();
+            }
+        }
+
+        function setupLoginForm() {
+            const loginBtn = document.getElementById('login-btn');
+            const userIn = document.getElementById('admin-username');
+            const passIn = document.getElementById('admin-password');
+            const errText = document.getElementById('login-error');
+
+            loginBtn.addEventListener('click', async () => {
+                const u = userIn.value.trim();
+                const p = passIn.value;
+                if (!u || !p) {
+                    errText.textContent = 'Please enter username and password';
+                    return;
+                }
+
+                const token = btoa(u + ':' + p);
+                
+                const originalHtml = loginBtn.innerHTML;
+                loginBtn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><path d="M21 12a9 9 0 1 1-6.219-8.56"></path></svg> Authenticating...';
+                loginBtn.disabled = true;
+
+                const success = await fetchStats(token);
+                
+                loginBtn.innerHTML = originalHtml;
+                loginBtn.disabled = false;
+
+                if (success) {
+                    sessionStorage.setItem('admin_token', token);
+                    document.getElementById('login-overlay').style.opacity = '0';
+                    setTimeout(() => {
+                        document.getElementById('login-overlay').style.display = 'none';
+                        document.getElementById('admin-content').style.display = 'flex';
+                    }, 300);
+                } else {
+                    errText.textContent = 'Invalid credentials. Access denied.';
+                }
+            });
+
+            passIn.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') loginBtn.click();
+            });
+        }
+
+        async function fetchStats(token) {
+            if (!token) return false;
+            try {
+                const response = await fetch('/api/stats', {
+                    headers: { 'Authorization': 'Basic ' + token }
+                });
+                const data = await response.json();
+
+                if (response.status === 401) {
+                    sessionStorage.removeItem('admin_token');
+                    return false;
+                }
+                if (data.error) {
+                    alert('Error loading stats: ' + data.error);
+                    return false;
+                }
+
+                renderStats(data.stats || []);
+                renderCharts(data.stats || []);
+                return true;
+            } catch (err) {
+                console.error(err);
+                document.getElementById('stats-table-body').innerHTML = '<tr><td colspan="5" style="text-align: center; color: #f87171;">Failed to load server data.</td></tr>';
+                return false;
+            }
+        }
+
+        function renderStats(stats) {
+            const tableBody = document.getElementById('stats-table-body');
+            const totalUsersEl = document.getElementById('total-users');
+            const totalRequestsEl = document.getElementById('total-requests');
+            const totalTokensEl = document.getElementById('total-tokens');
+            
+            const todayUsersEl = document.getElementById('today-users');
+            const todayRequestsEl = document.getElementById('today-requests');
+            const todayTokensEl = document.getElementById('today-tokens');
+
+            if (stats.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 40px;">No usage data found yet.</td></tr>';
+                totalUsersEl.textContent = '0'; totalRequestsEl.textContent = '0'; totalTokensEl.textContent = '0';
+                return;
+            }
+
+            let html = '';
+            let totalReqs = 0;
+            let totalTks = 0;
+            
+            let todayUsers = 0;
+            let todayReqs = 0;
+            let todayTks = 0;
+            const todayDateKey = dateKey(new Date());
+
+            stats.forEach(row => {
+                totalReqs += row.requests_count || 0;
+                totalTks += row.tokens_used || 0;
+                
+                // ตรวจสอบว่าผู้ใช้เข้าใช้งานวันนี้หรือไม่
+                if (row.last_active && dateKey(new Date(row.last_active)) === todayDateKey) {
+                    todayUsers++;
+                    todayReqs += row.requests_count || 0;
+                    todayTks += row.tokens_used || 0;
+                }
+
+                const date = new Date(row.last_active).toLocaleString('th-TH', { dateStyle: 'medium', timeStyle: 'short' });
+                const initial = (row.username || '?').charAt(0).toUpperCase();
+
+                html += `
+                    <tr>
+                        <td>
+                            <div class="user-cell">
+                                <div class="user-avatar-mini">${initial}</div>
+                                <span style="font-family: var(--font-sans); font-weight: 500;">${escapeHtml(row.username)}</span>
+                            </div>
+                        </td>
+                        <td style="color: var(--text-muted); font-family: var(--font-mono); font-size: 0.85rem;">${escapeHtml(row.ip_address || '-')}</td>
+                        <td style="font-weight: 500;">${(row.requests_count || 0).toLocaleString()}</td>
+                        <td style="color: #38bdf8; font-weight: 600;">${(row.tokens_used || 0).toLocaleString()}</td>
+                        <td style="color: var(--text-secondary); font-size: 0.85rem;">
+                            <span class="status-dot"></span>${date}
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+            totalUsersEl.textContent = stats.length.toLocaleString();
+            totalRequestsEl.textContent = totalReqs.toLocaleString();
+            totalTokensEl.textContent = totalTks.toLocaleString();
+            
+            // แสดงข้อมูลของวันนี้
+            if(todayUsersEl) todayUsersEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> Active Today: ${todayUsers.toLocaleString()}`;
+            if(todayRequestsEl) todayRequestsEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> Active Today: ${todayReqs.toLocaleString()}`;
+            if(todayTokensEl) todayTokensEl.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg> Active Today: ${todayTks.toLocaleString()}`;
+        }
+
+        // --- Chart.js Implementations ---
+        const charts = {};
+        const PALETTE = ['#38bdf8', '#818cf8', '#34d399', '#fbbf24', '#f472b6', '#a78bfa', '#fb923c', '#2dd4bf'];
+        const STYLE = {
+            color: '#94a3b8',
+            borderColor: 'rgba(255,255,255,0.05)',
+            font: { family: "'Inter', sans-serif" }
+        };
+
+        function showChartEmpty(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            canvas.style.display = 'none';
+            let wrap = canvas.parentElement;
+            if (!wrap.querySelector('.chart-empty')) {
+                const msg = document.createElement('div');
+                msg.className = 'chart-empty';
+                msg.style.cssText = "display:flex;align-items:center;justify-content:center;height:100%;color:var(--text-muted);";
+                msg.textContent = 'Insufficient Data';
+                wrap.appendChild(msg);
+            }
+        }
+        function clearChartEmpty(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            if (!canvas) return;
+            canvas.style.display = '';
+            const empty = canvas.parentElement.querySelector('.chart-empty');
+            if (empty) empty.remove();
+        }
+        function destroyChart(key) { if (charts[key]) { charts[key].destroy(); delete charts[key]; } }
+
+        function renderCharts(stats) {
+            Object.keys(charts).forEach(destroyChart);
+            Chart.defaults.color = STYLE.color;
+            Chart.defaults.font.family = STYLE.font.family;
+
+            const hasData = stats && stats.length > 0;
+
+            // 1. Top 10 Users
+            if (hasData) {
+                const top = [...stats].sort((a, b) => (b.tokens_used || 0) - (a.tokens_used || 0)).slice(0, 10);
+                const labels = top.map(r => truncate(r.username || 'unknown', 14));
+                const tokens = top.map(r => r.tokens_used || 0);
+
+                if (tokens.every(v => v === 0)) showChartEmpty('top-users-chart');
+                else {
+                    clearChartEmpty('top-users-chart');
+                    const ctx = document.getElementById('top-users-chart').getContext('2d');
+                    
+                    // Create gradient for bars
+                    let grad = ctx.createLinearGradient(0, 0, 400, 0);
+                    grad.addColorStop(0, 'rgba(56, 189, 248, 0.6)');
+                    grad.addColorStop(1, 'rgba(129, 140, 248, 0.9)');
+
+                    charts.topUsers = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels,
+                            datasets: [{
+                                label: 'Tokens', data: tokens,
+                                backgroundColor: grad, borderRadius: 6, borderSkipped: false
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: customTooltip() },
+                            scales: {
+                                x: { grid: { color: STYLE.borderColor }, ticks: { callback: v => Number(v).toLocaleString() } },
+                                y: { grid: { display: false } }
+                            }
+                        }
+                    });
+                }
+            } else showChartEmpty('top-users-chart');
+
+            // 2. Token Distribution
+            if (hasData) {
+                const sorted = [...stats].sort((a, b) => (b.tokens_used || 0) - (a.tokens_used || 0));
+                const totalTokens = sorted.reduce((s, r) => s + (r.tokens_used || 0), 0);
+                if (totalTokens === 0) showChartEmpty('token-dist-chart');
+                else {
+                    let labels, data;
+                    if (sorted.length <= 8) {
+                        labels = sorted.map(r => truncate(r.username || 'unknown', 12));
+                        data = sorted.map(r => r.tokens_used || 0);
+                    } else {
+                        const top8 = sorted.slice(0, 8); const rest = sorted.slice(8);
+                        labels = [...top8.map(r => truncate(r.username, 12)), 'Others'];
+                        data = [...top8.map(r => r.tokens_used || 0), rest.reduce((s, r) => s + (r.tokens_used || 0), 0)];
+                    }
+                    clearChartEmpty('token-dist-chart');
+                    charts.tokenDist = new Chart(document.getElementById('token-dist-chart'), {
+                        type: 'doughnut',
+                        data: {
+                            labels,
+                            datasets: [{
+                                data, backgroundColor: labels.map((_, i) => i === labels.length-1 && labels[i]==='Others' ? '#334155' : PALETTE[i % PALETTE.length]),
+                                borderColor: '#1e293b', borderWidth: 2, hoverOffset: 6
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false, cutout: '70%',
+                            plugins: {
+                                legend: { position: 'right', labels: { boxWidth: 12, padding: 15, usePointStyle: true, pointStyle: 'circle' } },
+                                tooltip: customTooltip(ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()} tokens (${((ctx.parsed/totalTokens)*100).toFixed(1)}%)`)
+                            }
+                        }
+                    });
+                }
+            } else showChartEmpty('token-dist-chart');
+
+            // 3. Scatter Chart
+            if (hasData) {
+                const points = stats.map(r => ({ x: r.requests_count || 0, y: r.tokens_used || 0, label: r.username || 'unknown' }));
+                if (points.every(p => p.x === 0 && p.y === 0)) showChartEmpty('scatter-chart');
+                else {
+                    clearChartEmpty('scatter-chart');
+                    charts.scatter = new Chart(document.getElementById('scatter-chart'), {
+                        type: 'scatter',
+                        data: { datasets: [{
+                            label: 'Users', data: points,
+                            backgroundColor: 'rgba(56, 189, 248, 0.6)', borderColor: '#38bdf8', borderWidth: 1,
+                            pointRadius: ctx => Math.max(4, Math.min(Math.sqrt(ctx.raw?.y || 0)/3, 12)),
+                            pointHoverRadius: 8
+                        }]},
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            plugins: { legend: { display: false }, tooltip: customTooltip(ctx => `${ctx.raw.label}\nReqs: ${ctx.raw.x}\nTokens: ${ctx.raw.y.toLocaleString()}`) },
+                            scales: {
+                                x: { title: { display: true, text: 'Total API Requests', color: '#cbd5e1' }, grid: { color: STYLE.borderColor } },
+                                y: { title: { display: true, text: 'Tokens Consumed', color: '#cbd5e1' }, grid: { color: STYLE.borderColor } }
+                            }
+                        }
+                    });
+                }
+            } else showChartEmpty('scatter-chart');
+
+            // 4. Daily Activity (Line)
+            const days = 14; const today = new Date(); today.setHours(0,0,0,0);
+            const dayBuckets = Array.from({length: days}, (_, i) => {
+                const d = new Date(today); d.setDate(d.getDate() - (days - 1 - i));
+                return { key: dateKey(d), label: `${d.getDate()}/${d.getMonth()+1}`, users: 0, tokens: 0, set: new Set() };
+            });
+
+            if (hasData) {
+                stats.forEach(row => {
+                    if (!row.last_active) return;
+                    const ts = new Date(row.last_active); if(isNaN(ts)) return;
+                    const b = dayBuckets.find(b => b.key === dateKey(ts));
+                    if (b) {
+                        if (!b.set.has(row.username)) { b.set.add(row.username); b.users++; }
+                        b.tokens += row.tokens_used || 0;
+                    }
+                });
+                
+                if (!dayBuckets.some(b => b.users > 0 || b.tokens > 0)) showChartEmpty('daily-activity-chart');
+                else {
+                    clearChartEmpty('daily-activity-chart');
+                    const ctx = document.getElementById('daily-activity-chart').getContext('2d');
+                    let grad = ctx.createLinearGradient(0, 0, 0, 300);
+                    grad.addColorStop(0, 'rgba(129, 140, 248, 0.3)'); grad.addColorStop(1, 'rgba(129, 140, 248, 0)');
+
+                    charts.dailyActivity = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: dayBuckets.map(b => b.label),
+                            datasets: [{
+                                label: 'Active Users', data: dayBuckets.map(b => b.users),
+                                borderColor: '#818cf8', backgroundColor: grad, borderWidth: 2,
+                                tension: 0.4, fill: true, pointBackgroundColor: '#1e293b', pointBorderColor: '#818cf8', pointBorderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true, maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: { legend: { display: false }, tooltip: customTooltip(ctx => `${dayBuckets[ctx.dataIndex].label}\nUsers: ${dayBuckets[ctx.dataIndex].users}\nTokens: ${dayBuckets[ctx.dataIndex].tokens.toLocaleString()}`) },
+                            scales: {
+                                x: { grid: { display: false } },
+                                y: { grid: { color: STYLE.borderColor }, beginAtZero: true, ticks: { precision: 0 } }
+                            }
+                        }
+                    });
+                }
+            } else showChartEmpty('daily-activity-chart');
+        }
+
+        // Helpers
+        function customTooltip(labelFn) {
+            return {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)', titleColor: '#f8fafc', bodyColor: '#cbd5e1',
+                borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, padding: 12, cornerRadius: 8,
+                displayColors: false, callbacks: labelFn ? { label: labelFn } : undefined
+            };
+        }
+        function dateKey(d) { return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+        function truncate(s, n) { return s && s.length > n ? s.slice(0, n-1) + '…' : s; }
+        function escapeHtml(t) { return (t||'').toString().replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m])); }
+        
+        // Spinning animation for loading button
+        document.head.insertAdjacentHTML('beforeend', '<style>.spin { animation: spin 1s linear infinite; } @keyframes spin { 100% { transform: rotate(360deg); } }</style>');
+    </script>
 </body>
 </html>
