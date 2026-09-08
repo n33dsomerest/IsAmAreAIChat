@@ -53,6 +53,7 @@
     let currentSessionId = null;
     let isGenerating = false;
     let currentAbortController = null;
+    let userScrolledUp = false;
     let pendingFiles = []; // Array of { file, type, dataUrl, textContent }
     let selectedModel = localStorage.getItem('ai_chat_selected_model') || CONFIG.DEFAULT_MODEL;
     let systemPrompt = localStorage.getItem('ai_chat_system_prompt') || '';
@@ -130,23 +131,41 @@
             syncChatHeight();
             window.visualViewport.addEventListener('resize', () => {
                 syncChatHeight();
-                scrollToBottom();
+                scrollToBottom(true);
             });
         }
         messageInput.addEventListener('focus', () => {
             // Small delay lets the keyboard finish its open animation.
             setTimeout(() => {
                 syncChatHeight();
-                scrollToBottom();
-            }, 200);
+                scrollToBottom(true);
+            }, 300);
         });
         messageInput.addEventListener('blur', () => {
-            syncChatHeight();
-            scrollToBottom();
+            setTimeout(() => {
+                syncChatHeight();
+                scrollToBottom(true);
+            }, 100);
         });
 
         // Form submit
         chatForm.addEventListener('submit', handleSend);
+
+        // Track user scroll
+        if (chatMessages) {
+            chatMessages.addEventListener('scroll', function() {
+                const distanceFromBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight;
+                
+                // ถ้าระยะห่างจากขอบล่างน้อยกว่า 50px ถือว่าผู้ใช้อยู่ล่างสุด ให้กลับมาเลื่อนลงอัตโนมัติ
+                if (distanceFromBottom <= 50) {
+                    userScrolledUp = false;
+                } 
+                // ถ้าผู้ใช้เลื่อนขึ้นไปเกิน 250px ถึงจะยกเลิกการเลื่อนลงอัตโนมัติ (ป้องกัน AI พิมพ์ข้อความยาวๆ แล้วระบบคิดว่าผู้ใช้เลื่อน)
+                else if (distanceFromBottom > 250) {
+                    userScrolledUp = true;
+                }
+            });
+        }
 
         // Sidebar toggles
         if (toggleBtn) toggleBtn.addEventListener('click', toggleSidebar);
@@ -844,11 +863,13 @@
             welcomeScreen.style.display = 'flex';
         }
 
-        scrollToBottom();
+        scrollToBottom(true);
     }
 
-    function scrollToBottom() {
-        chatMessages.scrollTop = chatMessages.scrollHeight;
+    function scrollToBottom(force) {
+        if (force || !userScrolledUp) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
     }
 
     // On mobile, the soft keyboard shrinks the visualViewport. We set
@@ -938,7 +959,7 @@
         wrapper.appendChild(msgContent);
         chatMessages.appendChild(wrapper);
 
-        scrollToBottom();
+        scrollToBottom(true);
 
         // Apply highlight.js to new code blocks
         if (role === 'bot') {
@@ -1035,7 +1056,7 @@
         wrapper.appendChild(avatar);
         wrapper.appendChild(msgContent);
         chatMessages.appendChild(wrapper);
-        scrollToBottom();
+        scrollToBottom(true);
 
         // Start timer
         thinkingStartTime = Date.now();
