@@ -17,7 +17,7 @@
     const chatMessages = document.getElementById('chat-messages');
     const welcomeScreen = document.getElementById('welcome-screen');
     const fileInput = document.getElementById('file-input');
-    const attachBtn = document.getElementById('attach-btn');
+    const attachBtn = document.getElementById('plus-attach-btn');
     const filePreviewContainer = document.getElementById('file-preview-container');
     const stopBtn = document.getElementById('stop-btn');
     const modelSelector = document.getElementById('model-selector');
@@ -48,12 +48,34 @@
     const userStatsPopover = document.getElementById('user-stats-popover');
     const statRequests = document.getElementById('stat-requests');
     const statTokens = document.getElementById('stat-tokens');
+
+    // Canvas DOM
+    const canvasPanel = document.getElementById('canvas-panel');
+    const canvasIframe = document.getElementById('canvas-iframe');
+    const canvasMarkdownView = document.getElementById('canvas-markdown-view');
+    const canvasMermaidView = document.getElementById('canvas-mermaid-view');
+    const canvasPreview = document.getElementById('canvas-preview');
+    const canvasCodeEl = document.getElementById('canvas-code');
+    const canvasCodeContent = document.getElementById('canvas-code-content');
+    const canvasTabPreview = document.getElementById('canvas-tab-preview');
+    const canvasTabCode = document.getElementById('canvas-tab-code');
+    const canvasTitle = document.getElementById('canvas-title');
+    const canvasCopyBtn = document.getElementById('canvas-copy-btn');
+    const canvasDownloadBtn = document.getElementById('canvas-download-btn');
+    const canvasCloseBtn = document.getElementById('canvas-close-btn');
+    const plusMenuBtn = document.getElementById('plus-menu-btn');
+    const plusMenuPopup = document.getElementById('plus-menu-popup');
+    const plusCanvasBtn = document.getElementById('plus-canvas-btn');
+
     // State
     let sessions = [];
     let currentSessionId = null;
     let isGenerating = false;
     let currentAbortController = null;
     let userScrolledUp = false;
+    let canvasEnabled = false;
+    let canvasCurrentCode = '';
+    let canvasCurrentType = 'html';
     let pendingFiles = []; // Array of { file, type, dataUrl, textContent }
     let selectedModel = localStorage.getItem('ai_chat_selected_model') || CONFIG.DEFAULT_MODEL;
     let systemPrompt = localStorage.getItem('ai_chat_system_prompt') || '';
@@ -175,9 +197,23 @@
         // New Chat button
         newChatBtn.addEventListener('click', createNewSession);
 
-        // File upload
+        // File upload — Plus menu
+        plusMenuBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            plusMenuPopup.classList.toggle('hidden');
+        });
         attachBtn.addEventListener('click', function() {
+            plusMenuPopup.classList.add('hidden');
             fileInput.click();
+        });
+        plusCanvasBtn.addEventListener('click', function() {
+            plusMenuPopup.classList.add('hidden');
+            canvasEnabled = !canvasEnabled;
+            if (canvasEnabled) {
+                openCanvas('html', '<html><body style="display:flex;align-items:center;justify-content:center;height:100vh;font-family:system-ui;color:#999;"><p>Canvas is ready. Send a message to generate content.</p></body></html>', 'Canvas Ready');
+            } else {
+                closeCanvas();
+            }
         });
         fileInput.addEventListener('change', handleFileSelect);
 
@@ -247,6 +283,9 @@
             if (userInfoBtn && userStatsPopover && !userInfoBtn.contains(e.target)) {
                 userStatsPopover.classList.add('hidden');
             }
+            if (plusMenuBtn && plusMenuPopup && !plusMenuBtn.contains(e.target) && !plusMenuPopup.contains(e.target)) {
+                plusMenuPopup.classList.add('hidden');
+            }
         });
 
         // Copy button event delegation
@@ -296,6 +335,151 @@
                     statTokens.textContent = 'Error';
                 }
             });
+        }
+
+        // Canvas Panel events
+        canvasCloseBtn.addEventListener('click', closeCanvas);
+        canvasCopyBtn.addEventListener('click', function() {
+            navigator.clipboard.writeText(canvasCurrentCode).then(function() {
+                canvasCopyBtn.title = 'Copied!';
+                setTimeout(function() { canvasCopyBtn.title = 'Copy Code'; }, 1500);
+            });
+        });
+        canvasDownloadBtn.addEventListener('click', function() {
+            var ext = canvasCurrentType === 'html' ? '.html' : canvasCurrentType === 'mermaid' ? '.mmd' : '.md';
+            var blob = new Blob([canvasCurrentCode], { type: 'text/plain' });
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'canvas' + ext;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        });
+        canvasTabPreview.addEventListener('click', function() {
+            canvasTabPreview.classList.add('active');
+            canvasTabCode.classList.remove('active');
+            canvasPreview.style.display = '';
+            canvasCodeEl.style.display = 'none';
+        });
+        canvasTabCode.addEventListener('click', function() {
+            canvasTabCode.classList.add('active');
+            canvasTabPreview.classList.remove('active');
+            canvasPreview.style.display = 'none';
+            canvasCodeEl.style.display = '';
+        });
+    }
+
+    // --- Canvas Functions ---
+    function openCanvas(type, code, title) {
+        canvasCurrentCode = code;
+        canvasCurrentType = type;
+        canvasEnabled = true;
+        canvasTitle.textContent = title || (type === 'html' ? 'HTML Preview' : type === 'mermaid' ? 'Mermaid Diagram' : 'Markdown');
+
+        // Show preview tab by default
+        canvasTabPreview.classList.add('active');
+        canvasTabCode.classList.remove('active');
+        canvasPreview.style.display = '';
+        canvasCodeEl.style.display = 'none';
+
+        // Render content
+        renderCanvasContent(type, code);
+
+        // Set code view
+        canvasCodeContent.textContent = code;
+        hljs.highlightElement(canvasCodeContent);
+
+        // Open panel
+        canvasPanel.classList.add('open');
+    }
+
+    function closeCanvas() {
+        canvasPanel.classList.remove('open');
+        canvasEnabled = false;
+        // Clear iframe
+        canvasIframe.srcdoc = '';
+    }
+
+    function renderCanvasContent(type, code) {
+        // Hide all views first
+        canvasIframe.style.display = 'none';
+        canvasMarkdownView.style.display = 'none';
+        canvasMermaidView.style.display = 'none';
+
+        if (type === 'html') {
+            canvasIframe.style.display = '';
+            canvasIframe.srcdoc = code;
+        } else if (type === 'markdown' || type === 'md') {
+            canvasMarkdownView.style.display = '';
+            canvasMarkdownView.innerHTML = DOMPurify.sanitize(marked.parse(code));
+            canvasMarkdownView.querySelectorAll('pre code').forEach(function(block) {
+                hljs.highlightElement(block);
+            });
+        } else if (type === 'mermaid') {
+            canvasMermaidView.style.display = '';
+            canvasMermaidView.innerHTML = '';
+            try {
+                if (typeof mermaid !== 'undefined') {
+                    mermaid.initialize({ startOnLoad: false, theme: 'dark' });
+                    var mermaidId = 'mermaid-' + Date.now();
+                    mermaid.render(mermaidId, code).then(function(result) {
+                        canvasMermaidView.innerHTML = result.svg;
+                    }).catch(function(err) {
+                        canvasMermaidView.innerHTML = '<p style="color:#ef4444;">Mermaid Error: ' + err.message + '</p>';
+                    });
+                }
+            } catch (e) {
+                canvasMermaidView.innerHTML = '<p style="color:#ef4444;">Mermaid not available</p>';
+            }
+        }
+    }
+
+    function addCanvasButtonsToCodeBlocks(container) {
+        container.querySelectorAll('pre code').forEach(function(codeBlock) {
+            var pre = codeBlock.parentElement;
+            // Don't add button if it already exists
+            if (pre.querySelector('.open-in-canvas-btn')) return;
+
+            // Detect language
+            var lang = '';
+            codeBlock.classList.forEach(function(cls) {
+                if (cls.startsWith('language-')) {
+                    lang = cls.replace('language-', '').toLowerCase();
+                }
+            });
+
+            if (['html', 'markdown', 'md', 'mermaid'].indexOf(lang) === -1) return;
+
+            var btn = document.createElement('button');
+            btn.className = 'open-in-canvas-btn';
+            btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="3" y1="9" x2="21" y2="9"></line><line x1="9" y1="21" x2="9" y2="9"></line></svg> Open in Canvas';
+            btn.addEventListener('click', function() {
+                var code = codeBlock.textContent;
+                openCanvas(lang, code, lang.toUpperCase() + ' Preview');
+            });
+            pre.appendChild(btn);
+        });
+    }
+
+    function autoDetectCanvasContent(responseText) {
+        // Match code blocks with language specifiers
+        var codeBlockRegex = /```(html|markdown|md|mermaid)\s*\n([\s\S]*?)```/gi;
+        var match;
+        var lastHtmlMatch = null;
+
+        while ((match = codeBlockRegex.exec(responseText)) !== null) {
+            var lang = match[1].toLowerCase();
+            var code = match[2].trim();
+            if (lang === 'html') {
+                lastHtmlMatch = { lang: lang, code: code };
+            } else if (!lastHtmlMatch) {
+                // Open first non-html match if no html found
+                lastHtmlMatch = { lang: lang, code: code };
+            }
+        }
+
+        // Auto-open for HTML (prioritized)
+        if (lastHtmlMatch) {
+            openCanvas(lastHtmlMatch.lang, lastHtmlMatch.code, lastHtmlMatch.lang.toUpperCase() + ' Preview');
         }
     }
 
@@ -1336,6 +1520,12 @@
             msgContentElement.querySelectorAll('pre code').forEach(function(block) {
                 hljs.highlightElement(block);
             });
+
+            // Add "Open in Canvas" buttons to supported code blocks
+            addCanvasButtonsToCodeBlocks(msgContentElement);
+
+            // Auto-detect and open Canvas for HTML/Markdown/Mermaid code blocks
+            autoDetectCanvasContent(fullResponse);
 
             // Save final bot response
             currentSession.messages.push({ role: 'bot', content: fullResponse });

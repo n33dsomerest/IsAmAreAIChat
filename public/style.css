@@ -1433,6 +1433,261 @@ textarea::placeholder {
     margin-bottom: 0;
 }
 
+/* ===== Plus Menu ===== */
+.plus-menu-wrapper {
+    position: relative;
+}
+
+.plus-menu-popup {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 0;
+    background-color: var(--bg-sidebar);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    z-index: 50;
+    overflow: hidden;
+    min-width: 180px;
+    animation: plusMenuIn 0.15s ease;
+}
+
+.plus-menu-popup.hidden {
+    display: none;
+}
+
+@keyframes plusMenuIn {
+    from { opacity: 0; transform: translateY(8px) scale(0.96); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.plus-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px 16px;
+    background: none;
+    border: none;
+    color: var(--text-secondary);
+    font-family: var(--font-sans);
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.plus-menu-item:hover {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.plus-menu-item svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+}
+
+.plus-menu-item:hover svg {
+    opacity: 1;
+}
+
+/* ===== Canvas Panel ===== */
+.canvas-panel {
+    width: 0;
+    flex-shrink: 0;
+    background-color: var(--bg-sidebar);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.canvas-panel.open {
+    width: 50%;
+}
+
+.canvas-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background-color: rgba(0,0,0,0.15);
+    flex-shrink: 0;
+    min-height: 52px;
+}
+
+.canvas-tabs {
+    display: flex;
+    gap: 2px;
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-sm);
+    padding: 2px;
+}
+
+.canvas-tab {
+    padding: 6px 16px;
+    border-radius: 6px;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    font-family: var(--font-sans);
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.canvas-tab.active {
+    background-color: var(--bg-hover);
+    color: var(--text-primary);
+}
+
+.canvas-tab:hover:not(.active) {
+    color: var(--text-secondary);
+}
+
+.canvas-title {
+    flex: 1;
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+}
+
+.canvas-actions {
+    display: flex;
+    gap: 4px;
+}
+
+.canvas-action-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+}
+
+.canvas-body {
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+}
+
+.canvas-preview {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+
+.canvas-iframe {
+    width: 100%;
+    height: 100%;
+    border: none;
+    background: #fff;
+}
+
+.canvas-markdown-view {
+    padding: 24px;
+    overflow-y: auto;
+    height: 100%;
+    color: var(--text-primary);
+    line-height: 1.7;
+}
+
+.canvas-markdown-view h1,
+.canvas-markdown-view h2,
+.canvas-markdown-view h3 {
+    margin-top: 1.5em;
+    margin-bottom: 0.5em;
+}
+
+.canvas-markdown-view p {
+    margin-bottom: 1em;
+}
+
+.canvas-markdown-view code {
+    background: rgba(255,255,255,0.06);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+}
+
+.canvas-markdown-view pre {
+    background: rgba(0,0,0,0.3);
+    padding: 16px;
+    border-radius: var(--radius-sm);
+    overflow-x: auto;
+    margin-bottom: 1em;
+}
+
+.canvas-markdown-view pre code {
+    background: none;
+    padding: 0;
+}
+
+.canvas-mermaid-view {
+    padding: 24px;
+    overflow: auto;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.canvas-mermaid-view svg {
+    max-width: 100%;
+    height: auto;
+}
+
+.canvas-code {
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+}
+
+.canvas-code pre {
+    margin: 0;
+    height: 100%;
+}
+
+.canvas-code code {
+    display: block;
+    padding: 20px !important;
+    min-height: 100%;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    tab-size: 2;
+}
+
+/* Open in Canvas button on code blocks */
+.open-in-canvas-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-top: 8px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background: rgba(255,255,255,0.04);
+    color: var(--accent-color);
+    font-family: var(--font-sans);
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.open-in-canvas-btn:hover {
+    background: rgba(168, 199, 250, 0.1);
+    border-color: var(--accent-color);
+}
+
+.open-in-canvas-btn svg {
+    width: 14px;
+    height: 14px;
+}
+
 @media (max-width: 768px) {
     .sidebar {
         position: fixed;
@@ -1469,13 +1724,7 @@ textarea::placeholder {
         max-width: 90%;
     }
 
-    /* Mobile keyboard handling:
-       - Use 100dvh so the app shrinks when the keyboard opens (modern
-         browsers report dvh = dynamic viewport height that excludes
-         the keyboard).
-       - Fall back to 100vh + visualViewport JS for older browsers.
-       - Extra padding-bottom on chat-messages lets the scroll-to-bottom
-         land the latest message just above the input bar. */
+    /* Mobile keyboard handling */
     body {
         height: 100dvh;
     }
@@ -1485,18 +1734,22 @@ textarea::placeholder {
     }
 
     .chat-messages {
-        /* Always leave room for the input bar at the bottom, even when
-           the keyboard pushes the viewport up. */
         padding-bottom: 24px;
         scroll-padding-bottom: 24px;
         scroll-behavior: smooth;
     }
 
-    /* When the keyboard is open, the visualViewport.height shrinks. We
-       size the chat-area (and thus chat-messages) to that height via
-       a CSS variable the JS sets. Default = window inner height. */
     .chat-area {
         height: calc(var(--chat-height, 100dvh) - 60px);
         min-height: 0;
+    }
+
+    /* Canvas full-screen on mobile */
+    .canvas-panel.open {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        z-index: 200;
+        border-left: none;
     }
 }
