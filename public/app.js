@@ -1199,9 +1199,9 @@
 
             removeThinkingIndicator();
 
-            // Create UI element for streaming response
             var msgContentElement = appendMessageToUI('bot', '');
             var fullResponse = '';
+            var fullReasoning = '';
             
             // Setup reader for stream
             var reader = response.body.getReader();
@@ -1226,14 +1226,34 @@
 
                         try {
                             var dataObj = JSON.parse(dataStr);
-                            if (dataObj.choices && dataObj.choices[0] && dataObj.choices[0].delta && dataObj.choices[0].delta.content) {
-                                fullResponse += dataObj.choices[0].delta.content;
-                                
-                                // Render markdown with streaming cursor
-                                var rawHTML = marked.parse(fullResponse);
-                                var cleanHTML = DOMPurify.sanitize(rawHTML);
-                                msgContentElement.innerHTML = cleanHTML + '<span class="streaming-cursor"></span>';
-                                scrollToBottom();
+                            if (dataObj.choices && dataObj.choices[0] && dataObj.choices[0].delta) {
+                                var delta = dataObj.choices[0].delta;
+                                var updated = false;
+
+                                if (delta.reasoning) {
+                                    fullReasoning += delta.reasoning;
+                                    updated = true;
+                                }
+                                if (delta.content !== undefined && delta.content !== null && delta.content !== '') {
+                                    fullResponse += delta.content;
+                                    updated = true;
+                                }
+
+                                if (updated || (!fullResponse && !fullReasoning)) {
+                                    // Render markdown with streaming cursor
+                                    var displayHTML = '';
+                                    if (fullReasoning) {
+                                        // Keep details open while streaming
+                                        displayHTML += '<details class="reasoning-details" open><summary>กระบวนการคิดของ AI</summary><div class="reasoning-content">' + marked.parse(fullReasoning) + '</div></details>';
+                                    }
+                                    if (fullResponse) {
+                                        displayHTML += marked.parse(fullResponse);
+                                    }
+                                    
+                                    var cleanHTML = DOMPurify.sanitize(displayHTML);
+                                    msgContentElement.innerHTML = cleanHTML + '<span class="streaming-cursor"></span>';
+                                    scrollToBottom();
+                                }
                             }
                         } catch (e) {
                             console.warn('Error parsing stream chunk:', e, dataStr);
@@ -1243,7 +1263,14 @@
             }
 
             // Remove cursor and highlight code blocks when done
-            var finalHTML = DOMPurify.sanitize(marked.parse(fullResponse));
+            var finalDisplayHTML = '';
+            if (fullReasoning) {
+                finalDisplayHTML += '<details class="reasoning-details"><summary>กระบวนการคิดของ AI</summary><div class="reasoning-content">' + marked.parse(fullReasoning) + '</div></details>';
+            }
+            if (fullResponse) {
+                finalDisplayHTML += marked.parse(fullResponse);
+            }
+            var finalHTML = DOMPurify.sanitize(finalDisplayHTML);
             msgContentElement.innerHTML = finalHTML;
             msgContentElement.querySelectorAll('pre code').forEach(function(block) {
                 hljs.highlightElement(block);

@@ -29,7 +29,7 @@ module.exports = async function handler(req, res) {
         let bodyPayload = { model, messages, stream, include_usage: true };
 
         if (provider === 'okmd') {
-            apiUrl = 'https://gen.ai.kku.ac.th/okmd/api/v1';
+            apiUrl = 'https://gen.ai.kku.ac.th/okmd/api/v1/chat/completions';
             apiKey = process.env.PLAYGROUND_API_KEY;
             extraHeaders = {};
             bodyPayload = { model, messages, stream }; // Don't send OpenRouter specific flags
