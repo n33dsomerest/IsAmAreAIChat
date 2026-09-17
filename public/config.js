@@ -10,6 +10,10 @@ const CONFIG = {
     AVAILABLE_MODELS: [
         { id: 'openrouter/free', label: 'Auto Router', tag: 'On', provider: 'openrouter', icon: 'lobehub' },
         { id: 'nvidia/nemotron-3.5-lightning:free', label: 'NVIDIA Nemotron 3.5 lightning', tag: 'On', provider: 'openrouter', icon: 'nvidia' },
+        { id: 'stealth/union-alpha', label: 'Stealth Union Alpha', tag: 'On', provider: 'openrouter', icon: 'ghost' },
+        { id: 'z-ai/glm-5.2:free', label: 'Z-AI GLM 5.2', tag: 'On', provider: 'openrouter', icon: 'z-ai' },
+        
+
 
         // OKMD Models
         { id: 'claude-sonnet-5', label: 'Claude 5 Sonnet', tag: 'OKMD', provider: 'okmd', icon: 'claude' },
