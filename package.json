@@ -22,7 +22,8 @@
     "slipok:check": "node --env-file-if-exists=.env.local scripts/check-slipok.mjs",
     "qr:crop": "node scripts/crop-qr.mjs",
     "db:test-usage": "node --env-file-if-exists=.env.local scripts/test-usage.mjs",
-    "test:chat": "node --env-file-if-exists=.env.local scripts/test-chat.mjs"
+    "test:chat": "node --env-file-if-exists=.env.local scripts/test-chat.mjs",
+    "test:payments": "node --env-file-if-exists=.env.local scripts/test-payments.mjs"
   },
   "allowScripts": {
     "@tailwindcss/oxide": true,
