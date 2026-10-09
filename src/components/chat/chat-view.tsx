@@ -17,12 +17,18 @@ import {
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+import type { Artifact } from '@/lib/chat/artifacts';
+
+import { ArtifactCard } from '@/components/chat/artifact-card';
 import { ModelPicker, type PickerModel } from '@/components/chat/model-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
-type Part = { type: 'text'; text: string } | { type: 'reasoning'; text: string };
+type Part =
+  | { type: 'text'; text: string }
+  | { type: 'reasoning'; text: string }
+  | { type: 'artifact'; artifact: Artifact };
 
 type Turn = {
   id: string;
@@ -73,10 +79,19 @@ export function ChatView({
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns]);
 
-  const appendTo = useCallback((id: string, part: Part) => {
+const appendTo = useCallback((id: string, part: Part) => {
     setTurns((prev) =>
       prev.map((t) =>
-        t.id === id ? { ...t, parts: mergeText(t.parts, part.type, part.text) } : t,
+        t.id === id
+          ? {
+              ...t,
+              // Artifacts are whole objects, never merged — only deltas coalesce.
+              parts:
+                part.type === 'artifact'
+                  ? [...t.parts, part]
+                  : mergeText(t.parts, part.type, part.text),
+            }
+          : t,
       ),
     );
   }, []);
@@ -136,8 +151,10 @@ export function ChatView({
             if (!line.startsWith('data: ')) continue;
             const event = JSON.parse(line.slice(6));
             if (event.type === 'text-delta') appendTo(botId, { type: 'text', text: event.text });
-            if (event.type === 'reasoning-delta')
+if (event.type === 'reasoning-delta')
               appendTo(botId, { type: 'reasoning', text: event.text });
+            if (event.type === 'artifact')
+              appendTo(botId, { type: 'artifact', artifact: event.artifact });
             if (event.type === 'error') throw new Error('stream error');
           }
         }
@@ -450,22 +467,29 @@ export function ChatView({
 }
 
 function TurnView({ turn, streaming }: { turn: Turn; streaming: boolean }) {
-  const text = textOf(turn.parts);
-
   if (turn.role === 'user') {
     return (
       <div className="flex justify-end">
         <div className="bg-primary text-primary-foreground max-w-[85%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm whitespace-pre-wrap">
-          {text}
+          {turn.parts.map((p, i) => (p.type === 'text' ? <span key={i}>{p.text}</span> : null))}
         </div>
       </div>
     );
   }
 
+  const prose = turn.parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
+    .map((p) => p.text)
+    .join('');
+
   const thinking = turn.parts
     .filter((p) => p.type === 'reasoning')
     .map((p) => (p as { text: string }).text)
     .join('');
+
+  const artifacts = turn.parts.filter(
+    (p): p is { type: 'artifact'; artifact: Artifact } => p.type === 'artifact',
+  );
 
   return (
     <div className="space-y-2">
@@ -477,12 +501,18 @@ function TurnView({ turn, streaming }: { turn: Turn; streaming: boolean }) {
           </p>
         </details>
       )}
-      <div className="text-sm leading-relaxed whitespace-pre-wrap">
-        {text}
-        {streaming && !text && (
-          <Loader2 className="text-muted-foreground inline size-4 animate-spin" />
-        )}
-      </div>
+
+      {prose.trim() && (
+        <div className="text-sm leading-relaxed whitespace-pre-wrap">{prose}</div>
+      )}
+
+      {artifacts.map((p) => (
+        <ArtifactCard key={p.artifact.id} artifact={p.artifact} />
+      ))}
+
+      {streaming && !prose && !artifacts.length && (
+        <Loader2 className="text-muted-foreground inline size-4 animate-spin" />
+      )}
     </div>
   );
 }
@@ -494,7 +524,11 @@ function textOf(parts: Part[]): string {
     .join('');
 }
 
-function mergeText(parts: Part[], kind: Part['type'], text: string): Part[] {
+function mergeText(
+  parts: Part[],
+  kind: 'text' | 'reasoning',
+  text: string,
+): Part[] {
   const last = parts.at(-1);
   if (last && last.type === kind) {
     return [...parts.slice(0, -1), { type: kind, text: last.text + text } as Part];

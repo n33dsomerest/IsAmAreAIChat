@@ -7,9 +7,10 @@ import { requireUser } from '@/lib/api/auth';
 import { buildFallbackChain } from '@/lib/ai/resolve';
 import { generateWithFallback } from '@/lib/ai/generate';
 import { buildToolSet } from '@/lib/ai/tool-registry';
+import { artifactTools, extractArtifacts, type Artifact } from '@/lib/chat/artifacts';
 import { DEFAULT_SYSTEM_PROMPT, deriveTitle } from '@/lib/chat/history';
 import { db } from '@/lib/db';
-import { conversations, messages, usageEvents } from '@/lib/db/schema';
+import { artifacts, conversations, messages, usageEvents } from '@/lib/db/schema';
 
 export const maxDuration = 60;
 
@@ -37,6 +38,8 @@ const requestSchema = z.object({
   maxOutputTokens: z.number().int().positive().max(32000).optional(),
   /** Off by default: search is the one tool that costs a third-party call. */
   webSearch: z.boolean().default(false),
+  /** Lets the model produce artifacts for this turn. */
+  artifacts: z.boolean().default(true),
 });
 
 type CreditRow = {
@@ -73,6 +76,7 @@ export async function POST(request: Request) {
     temperature,
     maxOutputTokens,
     webSearch,
+    artifacts: wantArtifacts,
   } = parsed.data;
   const user = session.user;
   const uiMessages = incoming as UIMessage[];
@@ -148,33 +152,61 @@ export async function POST(request: Request) {
    */
   async function persistAssistant(
     parts: unknown[],
-    winner: { id: string; providerId: string; remoteModelId: string; providerName: string; displayName: string },
+    winner: {
+      id: string;
+      providerId: string;
+      remoteModelId: string;
+      providerName: string;
+      displayName: string;
+    },
     inputTokens?: number,
     outputTokens?: number,
+    targetConversationId?: string,
+    parentMessageId?: string,
   ) {
     try {
-      await db.insert(messages).values({
-        conversationId: conversationIdResolved!,
-        parentId: lastUserMessageId,
-        role: 'assistant',
-        parts,
-        modelSnapshot: {
-          modelId: winner.id,
-          providerId: winner.providerId,
-          remoteModelId: winner.remoteModelId,
-          providerName: winner.providerName,
-          displayName: winner.displayName,
-        },
-        usage: { inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0 },
-        creditsCost: 1,
-        status: 'complete',
-      });
+      const [row] = await db
+        .insert(messages)
+        .values({
+          conversationId: targetConversationId!,
+          parentId: parentMessageId ?? null,
+          role: 'assistant',
+          parts,
+          modelSnapshot: {
+            modelId: winner.id,
+            providerId: winner.providerId,
+            remoteModelId: winner.remoteModelId,
+            providerName: winner.providerName,
+            displayName: winner.displayName,
+          },
+          usage: { inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0 },
+          creditsCost: 1,
+          status: 'complete',
+        })
+        .returning({ id: messages.id });
+
+      // Artifacts get their own rows so they can be listed and shared without
+      // re-reading the message that produced them.
+      const artifactParts = parts.filter(
+        (p): p is { type: 'artifact'; artifact: Artifact } =>
+          Boolean(p && typeof p === 'object' && (p as { type?: string }).type === 'artifact'),
+      );
+
+      if (artifactParts.length) {
+        await db.insert(artifacts).values(
+          artifactParts.map((p) => ({
+            messageId: row.id,
+            title: p.artifact.title,
+            language: p.artifact.language,
+            source: p.artifact.source,
+          })),
+        );
+      }
     } catch {
       /* keep the delivered answer */
     }
   }
 
-  let lastUserMessageId: string | null = null;
 
   try {
     /* ── 3. persist the user's turn before we spend anything on it ────────── */
@@ -217,13 +249,18 @@ export async function POST(request: Request) {
       })
       .returning({ id: messages.id });
 
-    lastUserMessageId = storedUser[0].id;
 
     /* ── 4. walk the fallback chain ───────────────────────────────────────── */
     const chain = await buildFallbackChain(modelId);
 
     // Built once per request: MCP handshakes are cached inside the client.
     const tools = await buildToolSet({ webSearch });
+
+    // Artifacts created by the tool land here and are streamed as their own
+    // parts so the renderer can put them beside the prose.
+    const produced: Artifact[] = [];
+    let emitted = 0;
+    if (wantArtifacts) Object.assign(tools, artifactTools((a) => produced.push(a)));
 
     const failures: string[] = [];
     const result_ = await generateWithFallback({
@@ -263,7 +300,9 @@ export async function POST(request: Request) {
 
     const stream = result_.stream.pipeThrough(
       new TransformStream({
-        transform(chunk, controller) {
+        // Async on purpose: the `finish` event must not reach the client before
+        // the turn is durable, or a refresh straight afterwards loses it.
+        async transform(chunk, controller) {
           const type = chunk.type;
 
           if (type === 'text-start' || type === 'text-delta' || type === 'text-end') {
@@ -283,6 +322,16 @@ export async function POST(request: Request) {
           }
 
           // Tool lifecycle: the UI shows what the assistant is doing.
+          if (type === 'tool-result') {
+            controller.enqueue(sse({ ...(chunk as object) }));
+            // Emit only what has not been sent yet — the array is still needed
+            // at `finish`, where every artifact gets persisted.
+            for (const artifact of produced.slice(emitted)) {
+              controller.enqueue(sse({ type: 'artifact', artifact }));
+            }
+            emitted = produced.length;
+            return;
+          }
           if (type.startsWith('tool-')) {
             controller.enqueue(sse({ ...(chunk as object) }));
             return;
@@ -295,12 +344,31 @@ export async function POST(request: Request) {
               outputTokens: u?.outputTokens,
               latencyMs: Date.now() - startedAt,
             });
-            const partsWithText = parts.map((p) =>
-              p && typeof p === 'object' && 'text' in p
-                ? { ...p, text: answer }
-                : p,
+
+            // Inline ```artifact fences are pulled out here rather than in the
+            // browser, so what gets stored is already split.
+            const segments = extractArtifacts(answer).segments;
+            const partsWithText = [
+              ...segments.map((s) =>
+                s.type === 'text'
+                  ? { type: 'text', text: s.text }
+                  : { type: 'artifact', artifact: s.artifact },
+              ),
+            ];
+
+            for (const artifact of produced) {
+              partsWithText.push({ type: 'artifact', artifact });
+            }
+
+            await persistAssistant(
+              partsWithText,
+              result_.winner,
+              u?.inputTokens,
+              u?.outputTokens,
+              conversationIdResolved,
+              storedUser[0].id,
             );
-            void persistAssistant(partsWithText, result_.winner, u?.inputTokens, u?.outputTokens);
+
             controller.enqueue(
               sse({ type: 'finish', model: result_.winner.displayName, provider: result_.winner.providerName }),
             );

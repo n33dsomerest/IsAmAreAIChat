@@ -242,6 +242,7 @@ node scripts/crop-qr.mjs
 | `npm run test:payments` | ????? 18 ???: ??????? � ???? � ?????????? (????? SlipOK ????) |
 | `npm run test:conversations` | ทดสอบ 24 เคส: ประวัติ · branching · export · cascade |
 | `npm run test:tools` | ทดสอบ 21 เคส: ไฟล์แนบ · storage · เครื่องมือ · MCP (stub server จริง) |
+| `npm run test:artifacts` | ทดสอบ 17 เคส: แยก artifact จากข้อความ + เก็บลงฐานข้อมูล |
 | `npm run slipok:check` | ตรวจ SlipOK key + โควต้า + วันหมดอายุ |
 
 ## หมายเหตุ
@@ -264,5 +265,5 @@ node scripts/crop-qr.mjs
 - [ ] **เฟส 5** — SlipOK ตรวจสลีป + ให้เครดิตอัตโนมัติ ⭐
 - [x] **เฟส 6** — จัดการแชท (branching, folders, export)
 - [x] **เฟส 7** — ไฟล์ + web search + MCP
-- [ ] **เฟส 8** — Artifacts / Canvas
+- [x] **เฟส 8** — Artifacts / Canvas
 - [ ] **เฟส 9** — admin dashboard + i18n + PWA + deploy
