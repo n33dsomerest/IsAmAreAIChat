@@ -77,6 +77,7 @@ function normalize(raw) {
     remoteModelId: id,
     displayName: typeof raw.name === 'string' && raw.name ? raw.name : id,
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
+    maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
     capabilities: {
       vision: modalities.includes('image'),
       tools: params.includes('tools') || params.includes('tool_choice'),
@@ -161,6 +162,7 @@ async function sync(providerId, baseUrl, envKeyName, label) {
       await SQL`
         update public.provider_models
            set display_name = ${m.displayName}, context_window = ${m.contextWindow},
+               max_output = ${m.maxOutput},
                capabilities = ${SQL.json(m.capabilities)}, pricing = ${SQL.json(m.pricing)},
                enabled = ${enabled}
          where id = ${prev.id}
@@ -169,10 +171,10 @@ async function sync(providerId, baseUrl, envKeyName, label) {
     } else {
       await SQL`
         insert into public.provider_models
-          (provider_id, remote_model_id, display_name, context_window, capabilities,
-           pricing, enabled, is_fallback, sort_order, last_synced_at)
+          (provider_id, remote_model_id, display_name, context_window, max_output,
+           capabilities, pricing, enabled, is_fallback, sort_order, last_synced_at)
         values (${providerId}, ${m.remoteModelId}, ${m.displayName}, ${m.contextWindow},
-                ${SQL.json(m.capabilities)}, ${SQL.json(m.pricing)}, ${enabled},
+                ${m.maxOutput}, ${SQL.json(m.capabilities)}, ${SQL.json(m.pricing)}, ${enabled},
                 false, ${order}, now())
       `;
       inserted++;

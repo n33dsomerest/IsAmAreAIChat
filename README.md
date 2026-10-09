@@ -234,10 +234,16 @@ node scripts/crop-qr.mjs
 | `npm run db:test-trigger` | ทดสอบ signup trigger 7 เคส |
 | `npm run db:test-auth` | ทดสอบสมัคร/เข้าสู่ระบบจริงผ่าน Supabase API |
 | `npm run admin:promote -- <ชื่อ>` | ตั้งผู้ใช้เป็น admin |
+| `npm run admin:sync-models` | ดึงแคตตาล็อกโมเดลจาก provider ทุกตัว (`--all` / `--none` เปลี่ยนว่าเปิดใช้อะไร) |
 | `npm run test:e2e` | ทดสอบ 12 เคสผ่านเว็บจริง (ต้องรัน `npm start` ก่อน) |
+| `npm run test:ai` | ทดสอบ 21 เคส: แคตตาล็อกโมเดล · admin gate · เปิด/ปิดโมเดล · ลำดับ fallback |
 | `npm run slipok:check` | ตรวจ SlipOK key + โควต้า + วันหมดอายุ |
 
 ## หมายเหตุ
+
+- **รหัสผ่าน DB ที่มี `$` ต้อง encode เป็น `%24`** ในไฟล์ env — Next โหลด env บน Windows
+  แล้วมอง `$_...` เป็นตัวแปรและตัดทิ้งจนรหัสผ่านสั้นลง ทำให้ขึ้น `password authentication failed`
+  แม้สคริปต์ที่ใช้ `--env-file` จะต่อได้ปกติ (คนละ parser)
 
 - `.npmrc` ตั้ง `allow-scripts=false` เพื่อกลบ setting ระดับเครื่องที่ทำให้
   `shadcn` CLI รัน `npm install` ไม่ได้ — package.json ประกาศ `allowScripts` เองแล้วจึงไม่กระทบ
@@ -248,7 +254,7 @@ node scripts/crop-qr.mjs
 
 - [x] **เฟส 1** — scaffold · schema 18 ตาราง · RLS · credit engine · UI shell · QR
 - [x] **เฟส 2** — auth (username/password + Google) · free tier quota · middleware
-- [ ] **เฟส 3** — provider layer + fallback chain
+- [x] **เฟส 3** — provider layer + fallback chain
 - [ ] **เฟส 4** — `/api/chat` streaming + หักเครดิตจริง ⭐
 - [ ] **เฟส 5** — SlipOK ตรวจสลีป + ให้เครดิตอัตโนมัติ ⭐
 - [ ] **เฟส 6** — จัดการแชท (branching, folders, export)

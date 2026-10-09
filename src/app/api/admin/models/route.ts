@@ -1,11 +1,55 @@
 import { NextResponse } from 'next/server';
-import { eq } from 'drizzle-orm';
+import { asc, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { requireAdmin } from '@/lib/api/auth';
 import { setModelEnabled, setModelFallback } from '@/lib/ai/model-visibility';
 import { db } from '@/lib/db';
-import { providerModels } from '@/lib/db/schema';
+import { providerModels, providers } from '@/lib/db/schema';
+
+/**
+ * Every model in the catalogue, live or not.
+ *
+ * The public `/api/models` only ever returns enabled rows, so the admin view
+ * needs its own listing to see — and re-enable — what sync switched off.
+ */
+export async function GET(request: Request) {
+  const admin = await requireAdmin();
+  if (!admin.ok) return admin.response;
+
+  const { searchParams } = new URL(request.url);
+  const onlyLive = searchParams.get('live') === '1';
+
+  const rows = await db
+    .select({
+      id: providerModels.id,
+      displayName: providerModels.displayName,
+      remoteModelId: providerModels.remoteModelId,
+      contextWindow: providerModels.contextWindow,
+      capabilities: providerModels.capabilities,
+      pricing: providerModels.pricing,
+      enabled: providerModels.enabled,
+      isFallback: providerModels.isFallback,
+      sortOrder: providerModels.sortOrder,
+      lastSyncedAt: providerModels.lastSyncedAt,
+      providerId: providerModels.providerId,
+      providerName: providers.name,
+      providerEnabled: providers.enabled,
+    })
+    .from(providerModels)
+    .innerJoin(providers, eq(providerModels.providerId, providers.id))
+    .orderBy(asc(providers.sortOrder), asc(providerModels.sortOrder))
+    .limit(1000);
+
+  const models = onlyLive ? rows.filter((r) => r.enabled) : rows;
+
+  return NextResponse.json({
+    models: models.map((r) => ({
+      ...r,
+      lastSyncedAt: r.lastSyncedAt ? r.lastSyncedAt.toISOString() : null,
+    })),
+  });
+}
 
 const patchSchema = z.object({
   id: z.string().uuid(),

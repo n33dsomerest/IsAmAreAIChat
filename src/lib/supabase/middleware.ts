@@ -53,6 +53,12 @@ export async function updateSession(request: NextRequest) {
   );
 
   if (!user && !isPublic) {
+    // An API caller cannot follow a redirect to an HTML login page — it needs a
+    // status code it can branch on, not a 307 pointing at a form.
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
+    }
+
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.search = `?next=${encodeURIComponent(pathname + search)}`;

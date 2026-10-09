@@ -1,0 +1,256 @@
+
+> aichat@0.1.0 dev
+> next dev
+
+▲ Next.js 16.4.0 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://26.9.125.158:3000
+- Environments: .env.local, .env
+✓ Ready in 608ms
+✓ Running next.config.ts took 44ms
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead.
+
+  To migrate automatically, run:
+  npx @next/codemod@canary middleware-to-proxy .
+
+  Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+- Cache Components enabled
+- Partial Prefetching enabled
+
+ GET /login 200 in 983ms (next.js: 680ms, proxy.ts: 72ms, application-code: 231ms)
+ GET /api/debug-env 200 in 204ms (next.js: 179ms, proxy.ts: 5ms, application-code: 20ms)
+ GET /api/models 200 in 1129ms (next.js: 158ms, proxy.ts: 132ms, application-code: 838ms)
+ GET /api/admin/providers 403 in 294ms (next.js: 92ms, proxy.ts: 67ms, application-code: 135ms)
+ GET /api/admin/models 405 in 129ms (next.js: 58ms, proxy.ts: 65ms, application-code: 6ms)
+ GET /admin 307 in 425ms (next.js: 93ms, proxy.ts: 80ms, application-code: 252ms)
+Error: Route "/admin": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /api/admin/providers 200 in 253ms (next.js: 6ms, proxy.ts: 66ms, application-code: 181ms)
+ GET /api/admin/models 405 in 76ms (next.js: 5ms, proxy.ts: 65ms, application-code: 5ms)
+ GET /admin 200 in 612ms (next.js: 6ms, proxy.ts: 63ms, application-code: 544ms)
+Error: Route "/admin": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /admin/providers 200 in 316ms (next.js: 37ms, proxy.ts: 88ms, application-code: 192ms)
+Error: Route "/admin/providers": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /admin/models 200 in 779ms (next.js: 52ms, proxy.ts: 85ms, application-code: 643ms)
+Error: Route "/admin/models": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+✓ Compiled in 56ms
+ GET /api/models 200 in 682ms (next.js: 39ms, proxy.ts: 110ms, application-code: 533ms)
+ GET /api/admin/providers 403 in 216ms (next.js: 17ms, proxy.ts: 65ms, application-code: 134ms)
+ GET /api/admin/models 403 in 225ms (next.js: 40ms, proxy.ts: 62ms, application-code: 123ms)
+ GET /admin 307 in 288ms (next.js: 26ms, proxy.ts: 65ms, application-code: 197ms)
+Error: Route "/admin": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /api/admin/providers 200 in 238ms (next.js: 5ms, proxy.ts: 62ms, application-code: 171ms)
+ GET /api/admin/models 200 in 418ms (next.js: 5ms, proxy.ts: 66ms, application-code: 348ms)
+ GET /admin 200 in 598ms (next.js: 6ms, proxy.ts: 64ms, application-code: 527ms)
+Error: Route "/admin": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /admin/providers 200 in 292ms (next.js: 25ms, proxy.ts: 82ms, application-code: 185ms)
+Error: Route "/admin/providers": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /admin/models 200 in 688ms (next.js: 28ms, proxy.ts: 89ms, application-code: 572ms)
+Error: Route "/admin/models": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ PATCH /api/admin/models 200 in 494ms (next.js: 5ms, proxy.ts: 83ms, application-code: 406ms)
+ GET /api/models 200 in 284ms (next.js: 6ms, proxy.ts: 57ms, application-code: 221ms)
+ PATCH /api/admin/models 200 in 479ms (next.js: 5ms, proxy.ts: 63ms, application-code: 410ms)
+ GET /pricing 200 in 487ms (next.js: 399ms, proxy.ts: 3ms, application-code: 84ms)
+ GET /login 200 in 57ms (next.js: 12ms, proxy.ts: 3ms, application-code: 42ms)
+ GET / 200 in 629ms (next.js: 245ms, proxy.ts: 106ms, application-code: 278ms)
+Error: Route "/": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /pricing 200 in 333ms (next.js: 17ms, proxy.ts: 106ms, application-code: 209ms)
+Error: Route "/pricing": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+✓ Compiled in 500ms
+ GET /pricing 200 in 185ms (next.js: 116ms, proxy.ts: 3ms, application-code: 67ms)
+ GET /login 200 in 57ms (next.js: 14ms, proxy.ts: 2ms, application-code: 41ms)
+ GET / 200 in 1246ms (next.js: 386ms, proxy.ts: 114ms, application-code: 747ms)
+Error: Route "/": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /pricing 200 in 317ms (next.js: 8ms, proxy.ts: 90ms, application-code: 219ms)
+Error: Route "/pricing": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /api/models 200 in 307ms (next.js: 10ms, proxy.ts: 73ms, application-code: 223ms)
+ GET /api/admin/providers 403 in 213ms (next.js: 10ms, proxy.ts: 67ms, application-code: 136ms)
+ GET /api/admin/models 403 in 213ms (next.js: 11ms, proxy.ts: 67ms, application-code: 135ms)
+ GET /admin 307 in 278ms (next.js: 13ms, proxy.ts: 63ms, application-code: 202ms)
+Error: Route "/admin": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /api/admin/providers 200 in 267ms (next.js: 5ms, proxy.ts: 66ms, application-code: 196ms)
+ GET /api/admin/models 200 in 419ms (next.js: 5ms, proxy.ts: 62ms, application-code: 352ms)
+ GET /admin 200 in 639ms (next.js: 6ms, proxy.ts: 64ms, application-code: 569ms)
+Error: Route "/admin": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /admin/providers 200 in 289ms (next.js: 18ms, proxy.ts: 83ms, application-code: 188ms)
+Error: Route "/admin/providers": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ GET /admin/models 200 in 728ms (next.js: 13ms, proxy.ts: 92ms, application-code: 622ms)
+Error: Route "/admin/models": Next.js encountered the unstable value `Date.now()` while prerendering.
+
+This value can change between renders, so it must be either prerendered or computed later.
+
+Ways to fix this:
+  - [dynamic] Render at request time by adding a dynamic data access (e.g. `await connection()`) before this call
+  - [cache] Prerender and cache the value with `"use cache"`
+  - [client] Render the value on the client with `"use client"`
+  - [measure] If the value is for telemetry, use a timing API such as `performance.now()`
+
+Learn more: https://nextjs.org/docs/messages/blocking-prerender-current-time
+    at AppLayout (<anonymous>)
+ PATCH /api/admin/models 200 in 473ms (next.js: 5ms, proxy.ts: 67ms, application-code: 401ms)
+ GET /api/models 200 in 291ms (next.js: 5ms, proxy.ts: 64ms, application-code: 222ms)
+ PATCH /api/admin/models 200 in 463ms (next.js: 5ms, proxy.ts: 66ms, application-code: 392ms)

@@ -1,10 +1,11 @@
-import { ArrowUp, Paperclip, Sparkles } from 'lucide-react';
+import { Sparkles } from 'lucide-react';
 
+import { ChatComposer } from '@/components/chat/chat-composer';
 import { getCurrentUser } from '@/lib/auth/current-user';
-import { Button } from '@/components/ui/button';
+import { listSelectableModels } from '@/lib/ai/resolve';
 
 export default async function HomePage() {
-  const user = await getCurrentUser();
+  const [user, models] = await Promise.all([getCurrentUser(), listSelectableModels()]);
 
   return (
     <main className="flex min-h-0 flex-1 flex-col">
@@ -20,28 +21,28 @@ export default async function HomePage() {
             </h1>
             <p className="text-muted-foreground mt-2 text-sm">
               คุณมี <span className="font-medium tabular-nums">{user?.credits ?? 0}</span>{' '}
-              เครดิต · การสนทนาจะเริ่มทำงานในเฟส 4
+              เครดิต · เลือกได้ {models.length} โมเดล
             </p>
           </div>
 
-          {/* Chat composer placeholder — wired to /api/chat in Phase 4. */}
-          <div className="rounded-xl border p-3">
-            <div className="text-muted-foreground min-h-16 text-sm">
-              พิมพ์ข้อความเพื่อเริ่มแชท…
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <Button variant="ghost" size="icon" disabled aria-label="แนบไฟล์">
-                <Paperclip className="size-4" />
-              </Button>
-              <Button size="icon" className="ml-auto" disabled aria-label="ส่งข้อความ">
-                <ArrowUp className="size-4" />
-              </Button>
-            </div>
-          </div>
+          {/* The composer is wired to the model catalogue; the streaming route
+              and credit reservation land in Phase 4. */}
+          <ChatComposer
+            models={models.map((m) => ({
+              id: m.id,
+              label: m.displayName,
+              provider: m.providerName,
+              providerId: m.providerId,
+              isFallback: m.isFallback,
+              contextWindow: m.contextWindow,
+              maxOutput: m.maxOutput,
+              capabilities: m.capabilities,
+            }))}
+          />
 
           <p className="text-muted-foreground mt-4 flex items-center justify-center gap-1.5 text-xs">
             <Sparkles className="size-3.5" />
-            เข้าสู่ระบบสำเร็จ — เฟส 2 เสร็จแล้ว
+            เฟส 3 เสร็จแล้ว — ระบบโมเดลและผู้ดูแลระบบพร้อมใช้งาน
           </p>
         </div>
       </div>
