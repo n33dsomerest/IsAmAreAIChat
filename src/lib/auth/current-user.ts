@@ -1,0 +1,60 @@
+import { cache } from 'react';
+
+import { createClient } from '@/lib/supabase/server';
+
+export type CurrentUser = {
+  id: string;
+  username: string;
+  email: string;
+  displayName: string | null;
+  role: 'user' | 'admin';
+  credits: number;
+  /** true once they have ever paid — the daily request cap is lifted. */
+  hasPaid: boolean;
+};
+
+/**
+ * The signed-in user's profile, or null.
+ *
+ * Wrapped in React `cache` so the layout, sidebar and page can each ask for it
+ * during one render without re-running the query. Reads go through the Supabase
+ * client (not Drizzle) so Row Level Security applies.
+ */
+export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return null;
+
+  const { data: profile, error } = await supabase
+    .from('users')
+    .select('username, email, display_name, role, credits_balance, first_paid_at')
+    .eq('id', user.id)
+    .single();
+
+  // The profile is written by a database trigger on signup. Anything other
+  // than "row missing" is a real problem — most often missing table grants,
+  // which otherwise looks identical to being signed out and hides the bug.
+  if (error) {
+    console.error('[auth] failed to load profile:', error.message, error.code, error.hint);
+    return null;
+  }
+  if (!profile) {
+    console.error('[auth] signed-in user has no profile row:', user.id);
+    return null;
+  }
+
+  return {
+    id: user.id,
+    username: profile.username,
+    email: profile.email,
+    displayName: profile.display_name,
+    role: profile.role,
+    credits: profile.credits_balance,
+    hasPaid: Boolean(profile.first_paid_at),
+  };
+});
+
+export const isAdmin = (user: CurrentUser | null) => user?.role === 'admin';
