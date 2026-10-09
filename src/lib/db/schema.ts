@@ -389,6 +389,13 @@ export const usageEvents = pgTable(
     modelId: uuid('model_id').references(() => providerModels.id, {
       onDelete: 'set null',
     }),
+    /** Which model actually answered — the pick is only the first attempt. */
+    providerId: uuid('provider_id').references(() => providers.id, {
+      onDelete: 'set null',
+    }),
+    remoteModelId: text('remote_model_id'),
+    providerName: text('provider_name'),
+    attempts: integer('attempts').notNull().default(0),
     modelSnapshot: text('model_snapshot'),
     inputTokens: integer('input_tokens').notNull().default(0),
     outputTokens: integer('output_tokens').notNull().default(0),
@@ -406,6 +413,7 @@ export const usageEvents = pgTable(
     index('usage_events_user_created_idx').on(t.userId, t.createdAt.desc()),
     index('usage_events_model_idx').on(t.modelId),
     index('usage_events_status_idx').on(t.status),
+    index('usage_events_remote_model_idx').on(t.remoteModelId),
   ],
 );
 

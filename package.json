@@ -20,7 +20,9 @@
     "test:e2e": "node --env-file-if-exists=.env.local scripts/test-e2e.mjs",
     "test:ai": "node --env-file-if-exists=.env.local scripts/test-ai.mjs",
     "slipok:check": "node --env-file-if-exists=.env.local scripts/check-slipok.mjs",
-    "qr:crop": "node scripts/crop-qr.mjs"
+    "qr:crop": "node scripts/crop-qr.mjs",
+    "db:test-usage": "node --env-file-if-exists=.env.local scripts/test-usage.mjs",
+    "test:chat": "node --env-file-if-exists=.env.local scripts/test-chat.mjs"
   },
   "allowScripts": {
     "@tailwindcss/oxide": true,

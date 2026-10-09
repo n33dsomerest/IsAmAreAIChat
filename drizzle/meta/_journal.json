@@ -22,6 +22,13 @@
       "when": 1791570428806,
       "tag": "0002_add_is_fallback",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791572927728,
+      "tag": "0003_melodic_husk",
+      "breakpoints": true
     }
   ]
 }

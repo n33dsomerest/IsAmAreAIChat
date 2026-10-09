@@ -16,6 +16,9 @@ export class ProviderConfigError extends Error {
 }
 
 export type ResolvedModel = {
+  /** `provider_models.id` — what usage rows record, not the remote id. */
+  id: string;
+  providerId: string;
   model: LanguageModel;
   providerName: string;
   displayName: string;
@@ -138,6 +141,8 @@ function toModel(row: Candidate): ResolvedModel {
   // All three provider packages expose `languageModel()`; `chatModel()` exists
   // only on the OpenAI-compatible one, so it is not interchangeable.
   return {
+    id: row.id,
+    providerId: row.providerId,
     model: chatFactory(row.provider).languageModel(row.remoteModelId),
     providerName: row.provider.name,
     displayName: row.displayName,
@@ -146,36 +151,21 @@ function toModel(row: Candidate): ResolvedModel {
 }
 
 export async function resolveModelById(modelUuid: string): Promise<ResolvedModel> {
-  const [row] = await db
-    .select({
-      ...SELECTABLE,
-      modelEnabled: providerModels.enabled,
-      providerEnabled: providers.enabled,
-      provider: providers,
-    })
-    .from(providerModels)
-    .innerJoin(providers, eq(providerModels.providerId, providers.id))
-    .where(eq(providerModels.id, modelUuid))
-    .limit(1);
+  const row = (await listCandidates()).find((m) => m.id === modelUuid);
 
-  if (!row) throw new ProviderConfigError('Model not found');
-  if (!row.modelEnabled || !row.providerEnabled) {
-    throw new ProviderConfigError('Model or provider is disabled');
+  if (!row) {
+    // Distinguish "you typed nonsense" from "the admin switched it off".
+    const [any] = await db
+      .select({ id: providerModels.id })
+      .from(providerModels)
+      .where(eq(providerModels.id, modelUuid))
+      .limit(1);
+    throw new ProviderConfigError(
+      any ? 'Model or provider is disabled' : 'Model not found',
+    );
   }
 
-  return toModel({
-    id: row.id,
-    displayName: row.displayName,
-    remoteModelId: row.remoteModelId,
-    capabilities: row.capabilities,
-    contextWindow: row.contextWindow,
-    maxOutput: row.maxOutput,
-    isFallback: row.isFallback,
-    providerId: row.providerId,
-    providerName: row.providerName,
-    enabled: true,
-    provider: row.provider,
-  });
+  return toModel(row);
 }
 
 /**
