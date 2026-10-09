@@ -8,9 +8,12 @@ import { AppSidebar } from '@/components/app-sidebar';
 export function AppShell({
   user,
   children,
+  activeId,
 }: {
   user: CurrentUser | null;
   children: React.ReactNode;
+  /** Highlights the current conversation in the sidebar. */
+  activeId?: string;
 }) {
   return (
     <div className="flex h-dvh overflow-hidden">
@@ -20,6 +23,7 @@ export function AppShell({
         username={user?.username}
         isSignedIn={Boolean(user)}
         isAdmin={user?.role === 'admin'}
+        activeId={activeId}
       />
 
       <div className="flex min-w-0 flex-1 flex-col">

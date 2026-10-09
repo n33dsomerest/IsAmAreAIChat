@@ -5,7 +5,6 @@ import {
   LogOut,
   MessageSquarePlus,
   MoreHorizontal,
-  Search,
   Settings,
   Shield,
   Sparkles,
@@ -15,6 +14,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { ThemeToggle } from '@/components/theme-toggle';
+import { ConversationList } from '@/components/chat/conversation-list';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -34,6 +34,8 @@ type AppSidebarProps = {
   isSignedIn: boolean;
   username?: string;
   isAdmin?: boolean;
+  /** Highlights the current conversation in the list. */
+  activeId?: string;
   className?: string;
 };
 
@@ -42,6 +44,7 @@ export function AppSidebar({
   isSignedIn,
   username,
   isAdmin = false,
+  activeId,
   className,
 }: AppSidebarProps) {
   const router = useRouter();
@@ -105,33 +108,17 @@ export function AppSidebar({
 
       <div className="px-3 pb-2">
         <Button asChild className="w-full justify-start gap-2">
-          <Link href="/">
+          <Link href="/" onClick={() => router.push('/')}>
             <MessageSquarePlus className="size-4" />
             แชทใหม่
           </Link>
         </Button>
       </div>
 
-      <div className="px-3 pb-2">
-        <Button
-          variant="outline"
-          className="text-muted-foreground w-full justify-start gap-2"
-          disabled
-        >
-          <Search className="size-4" />
-          ค้นหาสนทนา
-        </Button>
-      </div>
-
       <Separator className="mx-3 w-auto" />
 
       <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto px-3 py-3">
-        <p className="text-muted-foreground px-1 pb-2 text-xs font-medium tracking-wide uppercase">
-          สนทนาล่าสุด
-        </p>
-        <p className="text-muted-foreground px-1 text-xs">
-          ยังไม่มีสนทนา — เริ่มแชทแรกได้เลย
-        </p>
+        <ConversationList activeId={activeId} />
       </div>
 
       <div className="space-y-2 border-t p-3">

@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 
-import { AppShell } from '@/components/app-shell';
+import { ShellClient } from '@/components/shell-client';
 import { getCurrentUser } from '@/lib/auth/current-user';
 
 export const metadata: Metadata = {
@@ -18,5 +18,5 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
 
   // The middleware guarantees a session for this subtree, so a null here means
   // the profile row is missing — render signed out rather than crash.
-  return <AppShell user={user}>{children}</AppShell>;
+  return <ShellClient user={user}>{children}</ShellClient>;
 }

@@ -130,6 +130,42 @@ export async function POST(request: Request) {
   const startedAt = Date.now();
   const abortController = new AbortController();
 
+  /**
+   * Writes the assistant turn once the stream is done.
+   *
+   * Best effort on purpose: a write failure here must not turn an answer the
+   * user is already reading into an error.
+   */
+  async function persistAssistant(
+    parts: unknown[],
+    winner: { id: string; providerId: string; remoteModelId: string; providerName: string; displayName: string },
+    inputTokens?: number,
+    outputTokens?: number,
+  ) {
+    try {
+      await db.insert(messages).values({
+        conversationId: conversationIdResolved!,
+        parentId: lastUserMessageId,
+        role: 'assistant',
+        parts,
+        modelSnapshot: {
+          modelId: winner.id,
+          providerId: winner.providerId,
+          remoteModelId: winner.remoteModelId,
+          providerName: winner.providerName,
+          displayName: winner.displayName,
+        },
+        usage: { inputTokens: inputTokens ?? 0, outputTokens: outputTokens ?? 0 },
+        creditsCost: 1,
+        status: 'complete',
+      });
+    } catch {
+      /* keep the delivered answer */
+    }
+  }
+
+  let lastUserMessageId: string | null = null;
+
   try {
     /* ── 3. persist the user's turn before we spend anything on it ────────── */
     const userMessage = uiMessages.at(-1);
@@ -171,6 +207,8 @@ export async function POST(request: Request) {
       })
       .returning({ id: messages.id });
 
+    lastUserMessageId = storedUser[0].id;
+
     /* ── 4. walk the fallback chain ───────────────────────────────────────── */
     const chain = await buildFallbackChain(modelId);
 
@@ -205,17 +243,27 @@ export async function POST(request: Request) {
     const sse = (payload: unknown) =>
       encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
 
+    // Accumulated so the assistant turn can be persisted once, at the end.
+    let answer = '';
+    const parts: unknown[] = [];
+
     const stream = result_.stream.pipeThrough(
       new TransformStream({
         transform(chunk, controller) {
           const type = chunk.type;
 
           if (type === 'text-start' || type === 'text-delta' || type === 'text-end') {
+            if (type === 'text-delta') answer += chunk.text;
+            if (type === 'text-start') parts.push({ type: 'text', text: '' });
             controller.enqueue(sse({ ...chunk }));
             return;
           }
 
-          if (type === 'reasoning-delta' || type === 'reasoning-start' || type === 'reasoning-end') {
+          if (type === 'reasoning-delta') {
+            controller.enqueue(sse({ ...chunk }));
+            return;
+          }
+          if (type === 'reasoning-start' || type === 'reasoning-end') {
             controller.enqueue(sse({ ...chunk }));
             return;
           }
@@ -227,6 +275,12 @@ export async function POST(request: Request) {
               outputTokens: u?.outputTokens,
               latencyMs: Date.now() - startedAt,
             });
+            const partsWithText = parts.map((p) =>
+              p && typeof p === 'object' && 'text' in p
+                ? { ...p, text: answer }
+                : p,
+            );
+            void persistAssistant(partsWithText, result_.winner, u?.inputTokens, u?.outputTokens);
             controller.enqueue(
               sse({ type: 'finish', model: result_.winner.displayName, provider: result_.winner.providerName }),
             );

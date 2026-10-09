@@ -481,6 +481,8 @@ export type ModelSnapshot = {
   modelId: string;
   displayName: string;
   providerName: string;
+  remoteModelId: string;
+  providerId: string;
 };
 
 export type UsageInfo = {
