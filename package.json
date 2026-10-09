@@ -16,6 +16,7 @@
     "db:test-trigger": "node --env-file-if-exists=.env.local scripts/test-trigger.mjs",
     "db:test-auth": "node --env-file-if-exists=.env.local scripts/test-auth.mjs",
     "admin:promote": "node --env-file-if-exists=.env.local scripts/promote-admin.mjs",
+    "admin:sync-models": "node --env-file-if-exists=.env.local scripts/sync-models.mjs",
     "test:e2e": "node --env-file-if-exists=.env.local scripts/test-e2e.mjs",
     "slipok:check": "node --env-file-if-exists=.env.local scripts/check-slipok.mjs",
     "qr:crop": "node scripts/crop-qr.mjs"

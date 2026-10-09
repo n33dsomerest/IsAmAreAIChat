@@ -15,6 +15,13 @@
       "when": 1791558849342,
       "tag": "0001_rls_and_credit_functions",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1791570428806,
+      "tag": "0002_add_is_fallback",
+      "breakpoints": true
     }
   ]
 }

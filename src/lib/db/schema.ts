@@ -280,6 +280,12 @@ export const providerModels = pgTable(
     /** USD per 1M tokens, from the provider's /models endpoint. */
     pricing: jsonb('pricing').$type<ModelPricing>().notNull().default({}),
     enabled: boolean('enabled').notNull().default(true),
+    /**
+     * Backup models are only tried once every non-fallback model has failed —
+     * this is how a paid "always available" model sits behind free ones
+     * without the user ever seeing the difference.
+     */
+    isFallback: boolean('is_fallback').notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     lastSyncedAt: timestamp('last_synced_at', { withTimezone: true }),
   },

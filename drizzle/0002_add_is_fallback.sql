@@ -1,0 +1,1 @@
+ALTER TABLE "provider_models" ADD COLUMN "is_fallback" boolean DEFAULT false NOT NULL;
