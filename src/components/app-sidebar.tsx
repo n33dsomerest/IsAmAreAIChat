@@ -13,6 +13,7 @@ import {
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
+import { LocaleToggle } from '@/components/locale-toggle';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { ConversationList } from '@/components/chat/conversation-list';
 import { Button } from '@/components/ui/button';
@@ -131,6 +132,7 @@ export function AppSidebar({
           <Button asChild variant="outline" size="sm" className="flex-1">
             <Link href="/pricing">เติมเครดิต</Link>
           </Button>
+          <LocaleToggle />
           <ThemeToggle />
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

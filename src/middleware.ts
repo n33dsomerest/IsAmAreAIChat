@@ -11,7 +11,11 @@ export const config = {
     /*
      * Everything except static assets and image files. Excluding them keeps
      * the session refresh off the hot path for CSS/JS/font requests.
+     *
+     * The PWA files are named explicitly rather than by extension: the service
+     * worker must be able to refresh the session when it asks for its own
+     * update, and `manifest.webmanifest` has no image extension to match.
      */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest\\.webmanifest|sw\\.js|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)',
   ],
 };

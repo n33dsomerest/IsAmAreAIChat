@@ -1,9 +1,11 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Noto_Sans_Thai } from 'next/font/google';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 
+import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar';
 import { ThemeProvider } from '@/components/theme-provider';
+import { I18nProvider } from '@/lib/i18n';
 import { SITE } from '@/lib/site-config';
 
 import './globals.css';
@@ -32,11 +34,31 @@ export const metadata: Metadata = {
     template: `%s · ${SITE.name}`,
   },
   description: `${SITE.taglineTh} / ${SITE.taglineEn}`,
+  applicationName: SITE.name,
+  manifest: '/manifest.webmanifest',
+  appleWebApp: { capable: true, title: SITE.name, statusBarStyle: 'default' },
+  icons: { icon: '/icon.svg', apple: '/icon.svg' },
+  openGraph: {
+    type: 'website',
+    siteName: SITE.name,
+    title: `${SITE.name} — ${SITE.taglineTh}`,
+    description: `${SITE.taglineTh} / ${SITE.taglineEn}`,
+    locale: 'th_TH',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#ffffff' },
+    { media: '(prefers-color-scheme: dark)', color: '#0a0a0a' },
+  ],
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html
+      // Set by the i18n provider once the stored preference resolves; the
+      // server render has to commit to one value to avoid a hydration mismatch.
       lang="th"
       suppressHydrationWarning
       className={`${sans.variable} ${mono.variable} ${thai.variable} h-full`}
@@ -48,7 +70,10 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
           enableSystem
           disableTransitionOnChange
         >
-          <TooltipProvider>{children}</TooltipProvider>
+<I18nProvider>
+            <ServiceWorkerRegistrar />
+            <TooltipProvider>{children}</TooltipProvider>
+          </I18nProvider>
         </ThemeProvider>
       </body>
     </html>
