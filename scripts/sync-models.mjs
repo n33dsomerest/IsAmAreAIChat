@@ -2,14 +2,15 @@
  * Seed the providers this deployment talks to, then pull each catalogue into
  * `provider_models`.
  *
- *   npm run admin:sync-models
+ *   npm run admin:sync-models                  # per-provider defaults below
+ *   npm run admin:sync-models -- --mode=all    # override every provider
+ *   npm run admin:sync-models -- --okmd=none   # override one provider
  *
  * Idempotent: existing rows are matched by `name` and updated in place, so it is
  * safe to re-run after changing a base URL or an env var name.
  *
  * Ordering is the fallback chain. `sortOrder` on the provider decides who gets
- * tried first, so the free provider comes before the paid backup. Within a
- * provider, `:free` model ids are classified as non-fallback automatically.
+ * tried first, so the free provider comes before the paid backup.
  */
 import postgres from 'postgres';
 
@@ -18,19 +19,15 @@ const SQL = postgres(process.env.DATABASE_URL, { max: 1, prepare: false });
 /**
  * What to enable after discovering the catalogue.
  *
- *   (default)    only `:free` models — 458 paid models in the picker is
- *                unusable, and auto-flagging them as fallbacks buries the
- *                other providers at the very end of a 400-long chain
- *   --all        enable everything (useful when curating by hand)
- *   --none       discover only, enable nothing
+ *   free   only `:free` model ids
+ *   all    everything the provider listed
+ *   none   discover only, enable nothing
  *
- * Idempotent: existing rows are matched by remote_model_id and updated in place.
+ * Kept per provider because the two are genuinely different: OpenRouter exposes
+ * 458 models of which 16 are free, while OKMD is a university gateway where
+ * every model is usable, so all of them are enabled.
  */
-const MODE = process.argv.includes('--all')
-  ? 'all'
-  : process.argv.includes('--none')
-    ? 'none'
-    : 'free';
+const MODES = new Set(['free', 'all', 'none']);
 
 const PROVIDERS = [
   {
@@ -40,6 +37,7 @@ const PROVIDERS = [
     baseUrl: 'https://openrouter.ai/api/v1',
     envKeyName: 'OPENROUTER_API_KEY',
     sortOrder: 1,
+    mode: 'free',
   },
   {
     name: 'okmd',
@@ -48,8 +46,22 @@ const PROVIDERS = [
     baseUrl: 'https://gen.ai.kku.ac.th/okmd/api/v1',
     envKeyName: 'OKMD_API_KEY',
     sortOrder: 2,
+    mode: 'all',
   },
 ];
+
+/** `--mode=x` sets the default, `--<slug>=x` overrides a single provider. */
+const overrides = new Map();
+for (const arg of process.argv.slice(2)) {
+  const [key, value] = arg.replace(/^--/, '').split('=');
+  if (value && MODES.has(value)) overrides.set(key === 'mode' ? '*' : key, value);
+}
+if (process.argv.includes('--all')) overrides.set('*', 'all');
+if (process.argv.includes('--none')) overrides.set('*', 'none');
+
+function modeFor(provider) {
+  return overrides.get(provider.name) ?? overrides.get('*') ?? provider.mode;
+}
 
 /** Minimal port of src/lib/ai/sync-models.ts — this script runs outside Next. */
 function num(v) {
@@ -114,7 +126,9 @@ async function upsertProvider(p) {
   return row.id;
 }
 
-async function sync(providerId, baseUrl, envKeyName, label) {
+async function sync(providerId, provider) {
+  const { baseUrl, envKeyName, display: label } = provider;
+  const mode = modeFor(provider);
   const apiKey = process.env[envKeyName];
   if (!apiKey) {
     console.log(`  ✗ ${label}: ${envKeyName} is not set — skipping`);
@@ -156,7 +170,7 @@ async function sync(providerId, baseUrl, envKeyName, label) {
     seen.add(m.remoteModelId);
     const prev = byRemote.get(m.remoteModelId);
     const free = isFree(m.remoteModelId);
-    const enabled = MODE === 'all' ? true : MODE === 'none' ? false : free;
+    const enabled = mode === 'all' ? true : mode === 'none' ? false : free;
 
     if (prev) {
       await SQL`
@@ -188,9 +202,9 @@ async function sync(providerId, baseUrl, envKeyName, label) {
   }
 
   const freeCount = remote.filter((m) => isFree(m.remoteModelId)).length;
-  const enabledCount = MODE === 'none' ? 0 : MODE === 'all' ? remote.length : freeCount;
+  const enabledCount = mode === 'none' ? 0 : mode === 'all' ? remote.length : freeCount;
   console.log(
-    `  ✓ ${label}: discovered ${remote.length} (${freeCount} free) · enabled ${enabledCount}` +
+    `  ✓ ${label}: discovered ${remote.length} (${freeCount} free) · mode=${mode} → enabled ${enabledCount}` +
       ` · +${inserted} new, ${updated} updated, ${gone.length} disabled`,
   );
 }
@@ -199,13 +213,13 @@ try {
   for (const p of PROVIDERS) {
     const id = await upsertProvider(p);
     console.log(`\n▸ ${p.display}  (${p.baseUrl})`);
-    await sync(id, p.baseUrl, p.envKeyName, p.display);
+    await sync(id, p);
   }
 
   const summary = await SQL`
     select p.name, p.sort_order,
            count(*) filter (where pm.enabled) as enabled,
-           count(*) filter (where pm.enabled and not pm.is_fallback) as free_models
+           count(*) filter (where pm.enabled and not pm.is_fallback) as primary
       from public.providers p
       left join public.provider_models pm on pm.provider_id = p.id
      group by p.name, p.sort_order
@@ -213,7 +227,7 @@ try {
   `;
   console.log('\n── catalogue ──');
   for (const r of summary) {
-    console.log(`  ${r.name.padEnd(14)} enabled=${r.enabled}  free=${r.free_models}`);
+    console.log(`  ${r.name.padEnd(14)} enabled=${r.enabled}  primary=${r.primary}`);
   }
 } finally {
   await SQL.end();
