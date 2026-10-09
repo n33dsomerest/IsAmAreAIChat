@@ -1,11 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ArrowUp, Download, Loader2, Pencil, RotateCcw, Square, TriangleAlert, WifiOff } from 'lucide-react';
+import {
+  ArrowUp,
+  Download,
+  FileText,
+  Globe,
+  Loader2,
+  Pencil,
+  RotateCcw,
+  Square,
+  TriangleAlert,
+  WifiOff,
+  X,
+} from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
 import { ModelPicker, type PickerModel } from '@/components/chat/model-picker';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -18,6 +31,8 @@ type Turn = {
   /** More than one sibling — this turn was forked at some point. */
   branchCount?: number;
 };
+
+type PendingFile = { id: string; name: string; kind: string; sizeBytes: number };
 
 type Status =
   | { kind: 'idle' }
@@ -48,6 +63,11 @@ export function ChatView({
   const [status, setStatus] = useState<Status>({ kind: 'idle' });
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [webSearch, setWebSearch] = useState(false);
+  const [files, setFiles] = useState<PendingFile[]>([]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -62,7 +82,12 @@ export function ChatView({
   }, []);
 
   const stream = useCallback(
-    async (history: Turn[], botId: string) => {
+    async (
+      history: Turn[],
+      botId: string,
+      targetConversationId: string | undefined,
+      withSearch: boolean,
+    ) => {
       setStatus({ kind: 'streaming', model: '' });
       const controller = new AbortController();
       abortRef.current = controller;
@@ -72,8 +97,12 @@ export function ChatView({
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
-            conversationId,
+            // Spelled out rather than closing over `conversationId`: this
+            // callback is also used for forks, which always target the
+            // conversation currently on screen.
+            conversationId: targetConversationId,
             modelId,
+            webSearch: withSearch,
             messages: history.map((t) => ({ role: t.role, parts: t.parts })),
           }),
           signal: controller.signal,
@@ -91,7 +120,7 @@ export function ChatView({
 
         // A brand-new conversation was created server side — follow it.
         const created = res.headers.get('x-conversation-id');
-        if (!conversationId && created) router.replace(`/chat/${created}`);
+        if (!targetConversationId && created) router.replace(`/chat/${created}`);
 
         const named = res.headers.get('x-model-name');
         if (named) setStatus({ kind: 'streaming', model: named });
@@ -113,6 +142,7 @@ export function ChatView({
           }
         }
         setStatus({ kind: 'idle' });
+        router.refresh();
       } catch (error) {
         setTurns((prev) => prev.filter((t) => t.id !== botId));
         setStatus({
@@ -123,12 +153,25 @@ export function ChatView({
         abortRef.current = null;
       }
     },
-    [appendTo, conversationId, modelId, router],
+    [appendTo, modelId, router],
   );
 
   const send = useCallback(async () => {
     const text = input.trim();
-    if (!text || status.kind === 'streaming' || !modelId) return;
+    if ((!text && files.length === 0) || status.kind === 'streaming' || !modelId) return;
+
+    // Uploads need a conversation to hang off, and a brand-new chat has none
+    // until its first turn is created.
+    let target = conversationId;
+    if (!target) {
+      const res = await fetch('/api/conversations', { method: 'POST' });
+      if (!res.ok) {
+        setStatus({ kind: 'error', message: 'สร้างสนทนาไม่สำเร็จ' });
+        return;
+      }
+      target = (await res.json()).id as string;
+      router.replace(`/chat/${target}`);
+    }
 
     const userTurn: Turn = { id: nextId(), role: 'user', parts: [{ type: 'text', text }] };
     const botId = nextId();
@@ -136,8 +179,9 @@ export function ChatView({
 
     setTurns([...history, { id: botId, role: 'assistant', parts: [] }]);
     setInput('');
-    await stream(history, botId);
-  }, [input, modelId, status.kind, stream, turns]);
+    setFiles([]);
+    await stream(history, botId, target, webSearch);
+  }, [conversationId, files.length, input, modelId, router, status.kind, stream, turns, webSearch]);
 
   /** Forks a turn server-side, then regenerates from that point. */
   async function forkFrom(turnId: string, replacement?: string) {
@@ -173,13 +217,35 @@ export function ChatView({
 
     if (fork.role === 'assistant') {
       setTurns([...before, { ...edited, parts: [] }]);
-      await stream([...before, { ...edited, parts: [] }], botId);
+      await stream([...before, { ...edited, parts: [] }], botId, conversationId, webSearch);
     } else {
       setTurns([...history, { id: botId, role: 'assistant', parts: [] }]);
-      await stream(history, botId);
+      await stream(history, botId, conversationId, webSearch);
     }
 
     router.refresh();
+  }
+
+  async function uploadFiles(list: FileList | null) {
+    if (!list?.length || !conversationId) return;
+    setUploading(true);
+    try {
+      for (const file of Array.from(list)) {
+        const form = new FormData();
+        form.append('conversationId', conversationId);
+        form.append('file', file);
+
+        const res = await fetch('/api/attachments', { method: 'POST', body: form });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          toast.error(data.error ?? `อัปโหลด ${file.name} ไม่สำเร็จ`);
+          continue;
+        }
+        setFiles((prev) => [...prev, data as PendingFile]);
+      }
+    } finally {
+      setUploading(false);
+    }
   }
 
   const busy = status.kind === 'streaming';
@@ -273,6 +339,25 @@ export function ChatView({
 
       <div className="border-t bg-background/80 backdrop-blur">
         <div className="mx-auto w-full max-w-2xl px-4 py-3">
+          {files.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {files.map((f) => (
+                <Badge key={f.id} variant="secondary" className="gap-1 pr-1">
+                  <FileText className="size-3" />
+                  <span className="max-w-40 truncate">{f.name}</span>
+                  <button
+                    type="button"
+                    aria-label={`เอา ${f.name} ออก`}
+                    className="hover:bg-background/60 rounded p-0.5"
+                    onClick={() => setFiles((prev) => prev.filter((x) => x.id !== f.id))}
+                  >
+                    <X className="size-3" />
+                  </button>
+                </Badge>
+              ))}
+            </div>
+          )}
+
           <div className="rounded-xl border bg-background focus-within:ring-2 focus-within:ring-ring/40">
             <Textarea
               value={input}
@@ -288,7 +373,47 @@ export function ChatView({
               disabled={busy}
             />
 
-            <div className="flex items-center gap-2 p-2">
+            <div className="flex items-center gap-1 p-2">
+              <input
+                ref={fileRef}
+                type="file"
+                multiple
+                accept="image/*,application/pdf,text/plain,text/markdown,text/csv,application/json"
+                className="hidden"
+                onChange={(e) => {
+                  void uploadFiles(e.target.files);
+                  e.target.value = '';
+                }}
+              />
+              <Button
+                size="icon"
+                variant="ghost"
+                className="size-8"
+                aria-label="แนบไฟล์"
+                disabled={busy || uploading || !conversationId}
+                title={conversationId ? 'แนบไฟล์' : 'เริ่มแชทก่อนจะแนบไฟล์ได้'}
+                onClick={() => fileRef.current?.click()}
+              >
+                {uploading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <FileText className="size-4" />
+                )}
+              </Button>
+
+              <Button
+                size="icon"
+                variant="ghost"
+                className={`size-8 ${webSearch ? 'text-primary' : ''}`}
+                aria-label="ค้นหาบนเว็บ"
+                aria-pressed={webSearch}
+                disabled={busy}
+                title={webSearch ? 'เปิดการค้นหาเว็บ' : 'ปิดการค้นหาเว็บ'}
+                onClick={() => setWebSearch((v) => !v)}
+              >
+                <Globe className="size-4" />
+              </Button>
+
               <ModelPicker models={models} value={modelId} onChange={setModelId} />
 
               {busy ? (
@@ -306,7 +431,7 @@ export function ChatView({
                   size="icon"
                   className="ml-auto"
                   aria-label="ส่งข้อความ"
-                  disabled={!input.trim() || !modelId}
+                  disabled={(!input.trim() && files.length === 0) || !modelId}
                   onClick={() => void send()}
                 >
                   <ArrowUp className="size-4" />
@@ -316,7 +441,7 @@ export function ChatView({
           </div>
 
           <p className="text-muted-foreground mt-2 text-center text-xs">
-            1 ข้อความ = 1 เครดิต · ผู้ช่วยอาจสลับโมเดลอัตโนมัติเมื่อโมเดลที่เลือกใช้ไม่ได้
+            1 ข้อความ = 1 เครดิต · การเรียกเครื่องมือไม่นับเครดิต · ผู้ช่วยอาจสลับโมเดลอัตโนมัติเมื่อโมเดลที่เลือกใช้ไม่ได้
           </p>
         </div>
       </div>

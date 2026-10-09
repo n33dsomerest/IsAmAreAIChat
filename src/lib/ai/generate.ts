@@ -55,6 +55,7 @@ export async function generateWithFallback({
   temperature,
   maxOutputTokens,
   abortSignal,
+  tools,
   onAttemptFailed,
 }: {
   chain: ResolvedModel[];
@@ -63,6 +64,7 @@ export async function generateWithFallback({
   temperature?: number;
   maxOutputTokens?: number;
   abortSignal?: AbortSignal;
+  tools?: ToolSet;
   onAttemptFailed?: (model: ResolvedModel, error: unknown) => void;
 }): Promise<GenerateResult> {
   if (!chain.length) {
@@ -83,6 +85,7 @@ export async function generateWithFallback({
         messages: modelMessages,
         temperature,
         maxOutputTokens,
+        tools,
         abortSignal,
         onError: ({ error }) => {
           onAttemptFailed?.(candidate, error);

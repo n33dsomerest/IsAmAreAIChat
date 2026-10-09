@@ -6,6 +6,7 @@ import type { UIMessage } from 'ai';
 import { requireUser } from '@/lib/api/auth';
 import { buildFallbackChain } from '@/lib/ai/resolve';
 import { generateWithFallback } from '@/lib/ai/generate';
+import { buildToolSet } from '@/lib/ai/tool-registry';
 import { DEFAULT_SYSTEM_PROMPT, deriveTitle } from '@/lib/chat/history';
 import { db } from '@/lib/db';
 import { conversations, messages, usageEvents } from '@/lib/db/schema';
@@ -34,6 +35,8 @@ const requestSchema = z.object({
   systemPrompt: z.string().max(8000).optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxOutputTokens: z.number().int().positive().max(32000).optional(),
+  /** Off by default: search is the one tool that costs a third-party call. */
+  webSearch: z.boolean().default(false),
 });
 
 type CreditRow = {
@@ -62,8 +65,15 @@ export async function POST(request: Request) {
     );
   }
 
-  const { conversationId, modelId, messages: incoming, systemPrompt, temperature, maxOutputTokens } =
-    parsed.data;
+  const {
+    conversationId,
+    modelId,
+    messages: incoming,
+    systemPrompt,
+    temperature,
+    maxOutputTokens,
+    webSearch,
+  } = parsed.data;
   const user = session.user;
   const uiMessages = incoming as UIMessage[];
 
@@ -212,6 +222,9 @@ export async function POST(request: Request) {
     /* ── 4. walk the fallback chain ───────────────────────────────────────── */
     const chain = await buildFallbackChain(modelId);
 
+    // Built once per request: MCP handshakes are cached inside the client.
+    const tools = await buildToolSet({ webSearch });
+
     const failures: string[] = [];
     const result_ = await generateWithFallback({
       chain,
@@ -219,6 +232,7 @@ export async function POST(request: Request) {
       systemPrompt: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
       temperature,
       maxOutputTokens,
+      tools,
       abortSignal: abortController.signal,
       onAttemptFailed: (_model, error) => {
         failures.push(error instanceof Error ? error.message : String(error));
@@ -265,6 +279,12 @@ export async function POST(request: Request) {
           }
           if (type === 'reasoning-start' || type === 'reasoning-end') {
             controller.enqueue(sse({ ...chunk }));
+            return;
+          }
+
+          // Tool lifecycle: the UI shows what the assistant is doing.
+          if (type.startsWith('tool-')) {
+            controller.enqueue(sse({ ...(chunk as object) }));
             return;
           }
 

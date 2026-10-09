@@ -24,7 +24,8 @@
     "db:test-usage": "node --env-file-if-exists=.env.local scripts/test-usage.mjs",
     "test:chat": "node --env-file-if-exists=.env.local scripts/test-chat.mjs",
     "test:payments": "node --env-file-if-exists=.env.local scripts/test-payments.mjs",
-    "test:conversations": "node --env-file-if-exists=.env.local scripts/test-conversations.mjs"
+    "test:conversations": "node --env-file-if-exists=.env.local scripts/test-conversations.mjs",
+    "test:tools": "node --env-file-if-exists=.env.local scripts/test-tools.mjs"
   },
   "allowScripts": {
     "@tailwindcss/oxide": true,
