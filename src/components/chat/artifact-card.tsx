@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Code2,
   Copy,
@@ -30,7 +30,29 @@ import { isRenderable, type Artifact } from '@/lib/chat/artifacts';
  */
 export function ArtifactCard({ artifact }: { artifact: Artifact }) {
   const [mode, setMode] = useState<'preview' | 'source'>('preview');
+  // `shown` keeps the panel mounted so the exit transition has something to run
+  // on; `open` is what the animation keys off. Unmounting on the same tick as
+  // the close would skip the exit entirely.
+  const [shown, setShown] = useState(false);
   const [open, setOpen] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
+
+  function show() {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+    setShown(true);
+    // Wait a frame so the element is in the DOM with its closed state before
+    // it flips to open, otherwise there is no transition to run.
+    requestAnimationFrame(() => setOpen(true));
+  }
+
+  function hide() {
+    setOpen(false);
+    closeTimer.current = setTimeout(() => setShown(false), 200);
+  }
 
   const renderable = isRenderable(artifact.language);
   const title = artifact.title ?? 'ชิ้นงาน';
@@ -56,7 +78,7 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
 
   return (
     <>
-      <div className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
+      <div className="hover:bg-muted/40 flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors duration-150">
         <div className="bg-muted text-muted-foreground grid size-9 shrink-0 place-items-center rounded-md">
           <FileCode2 className="size-4" />
         </div>
@@ -75,24 +97,25 @@ export function ArtifactCard({ artifact }: { artifact: Artifact }) {
           <Button size="icon" variant="ghost" className="size-8" aria-label="ดาวน์โหลด" onClick={() => download()}>
             <Download className="size-3.5" />
           </Button>
-          <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>
+          <Button size="sm" variant="secondary" onClick={show}>
             <PanelRightOpen className="size-3.5" />
             เปิด
           </Button>
         </div>
       </div>
 
-      {open && (
+      {shown && (
         <ArtifactPanel
           artifact={artifact}
           title={title}
           doc={doc}
           renderable={renderable}
           mode={mode}
+          open={open}
           onModeChange={setMode}
           onCopy={() => void copy()}
           onDownload={download}
-          onClose={() => setOpen(false)}
+          onClose={hide}
         />
       )}
     </>
@@ -105,6 +128,7 @@ function ArtifactPanel({
   doc,
   renderable,
   mode,
+  open,
   onModeChange,
   onCopy,
   onDownload,
@@ -115,6 +139,7 @@ function ArtifactPanel({
   doc: string;
   renderable: boolean;
   mode: 'preview' | 'source';
+  open: boolean;
   onModeChange: (m: 'preview' | 'source') => void;
   onCopy: () => void;
   onDownload: () => void;
@@ -132,7 +157,11 @@ function ArtifactPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex justify-end bg-background/60 backdrop-blur-[2px]"
+      // The same utilities shadcn's Sheet uses, so the artifact panel opens and
+      // closes with the same motion as every other overlay in the app.
+      className={`fixed inset-0 z-50 flex justify-end duration-200 ease-out ${
+        open ? 'animate-in fade-in-0' : 'animate-out fade-out-0'
+      } bg-background/60 backdrop-blur-[2px]`}
       // A click on the backdrop closes, a drag that starts inside the panel does
       // not — without checking the target, releasing a text selection would
       // close the panel.
@@ -140,7 +169,11 @@ function ArtifactPanel({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="bg-background flex h-full w-full flex-col border-l shadow-2xl sm:max-w-[min(1100px,85vw)]">
+      <div
+        className={`bg-background flex h-full w-full flex-col border-l shadow-2xl duration-200 ease-out sm:max-w-[min(1100px,85vw)] ${
+          open ? 'animate-in slide-in-from-right-10' : 'animate-out slide-out-to-right-10'
+        }`}
+      >
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <h2 className="truncate text-sm font-medium">{title}</h2>
 
