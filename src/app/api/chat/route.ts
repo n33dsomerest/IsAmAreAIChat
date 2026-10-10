@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { UIMessage } from 'ai';
 
@@ -87,7 +87,12 @@ export async function POST(request: Request) {
     const [owned] = await db
       .select({ id: conversations.id })
       .from(conversations)
-      .where(eq(conversations.id, conversationId))
+      .where(
+        and(
+          eq(conversations.id, conversationId),
+          eq(conversations.userId, user.id),
+        ),
+      )
       .limit(1);
     if (!owned) {
       return NextResponse.json({ error: 'conversation_not_found' }, { status: 404 });
