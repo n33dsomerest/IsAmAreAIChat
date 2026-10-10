@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { and, desc, eq, sql } from 'drizzle-orm';
 
 import { requireUser } from '@/lib/api/auth';
+import { PLACEHOLDER_TITLES } from '@/lib/chat/history';
 import { db } from '@/lib/db';
 import { conversations, providerModels } from '@/lib/db/schema';
 
@@ -42,9 +43,12 @@ export async function POST() {
   const session = await requireUser();
   if (!session.ok) return session.response;
 
+  // A new conversation starts as a placeholder so uploads have something to
+  // hang off before the first message exists; /api/chat replaces it with a real
+  // title once that message arrives.
   const [row] = await db
     .insert(conversations)
-    .values({ userId: session.user.id, title: 'แชทใหม่' })
+    .values({ userId: session.user.id, title: PLACEHOLDER_TITLES[0] })
     .returning({ id: conversations.id });
 
   return NextResponse.json({ id: row.id }, { status: 201 });

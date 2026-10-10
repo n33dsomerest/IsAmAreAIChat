@@ -79,3 +79,23 @@ export function deriveTitle(text: string, fallback = 'New chat'): string {
   if (!line) return fallback;
   return line.length > 60 ? `${line.slice(0, 57)}…` : line;
 }
+
+/**
+ * Titles a conversation carries before anyone has named it: the client's own
+ * placeholder and the schema default. A conversation still holding one of
+ * these has not been named by the user, which is what makes it safe to replace
+ * the title automatically.
+ *
+ * Renaming through `PATCH /api/conversations/[id]` moves the row off this list,
+ * so an automatic title can never overwrite a name the user chose.
+ */
+export const PLACEHOLDER_TITLES: readonly string[] = ['แชทใหม่', 'New chat'];
+
+/** The text of a message, ignoring reasoning and other non-text parts. */
+export function textOf(parts: { type?: string; text?: unknown }[] | undefined): string {
+  if (!parts) return '';
+  return parts
+    .filter((p): p is { type: 'text'; text: string } => p.type === 'text' && typeof p.text === 'string')
+    .map((p) => p.text)
+    .join(' ');
+}

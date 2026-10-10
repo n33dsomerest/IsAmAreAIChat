@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, eq, sql } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { UIMessage } from 'ai';
 
@@ -8,7 +8,7 @@ import { buildFallbackChain } from '@/lib/ai/resolve';
 import { generateWithFallback } from '@/lib/ai/generate';
 import { buildToolSet } from '@/lib/ai/tool-registry';
 import { artifactTools, extractArtifacts, type Artifact } from '@/lib/chat/artifacts';
-import { DEFAULT_SYSTEM_PROMPT, deriveTitle } from '@/lib/chat/history';
+import { DEFAULT_SYSTEM_PROMPT, PLACEHOLDER_TITLES, deriveTitle, textOf } from '@/lib/chat/history';
 import { db } from '@/lib/db';
 import { artifacts, conversations, messages, usageEvents } from '@/lib/db/schema';
 
@@ -216,17 +216,13 @@ export async function POST(request: Request) {
   try {
     /* ── 3. persist the user's turn before we spend anything on it ────────── */
     const userMessage = uiMessages.at(-1);
+    const userText = textOf(userMessage?.parts as UIMessage['parts'] | undefined);
     if (!conversationIdResolved) {
       const [created] = await db
         .insert(conversations)
         .values({
           userId: user.id,
-          title: deriveTitle(
-            userMessage?.parts
-              .filter((p): p is { type: 'text'; text: string } => (p as { type?: string }).type === 'text')
-              .map((p) => (p as { text: string }).text)
-              .join(' ') ?? '',
-          ),
+          title: deriveTitle(userText),
           modelId,
           systemPrompt: systemPrompt ?? null,
         })
@@ -254,6 +250,25 @@ export async function POST(request: Request) {
       })
       .returning({ id: messages.id });
 
+    /* ── 3b. name the conversation after its first prompt ─────────────────── */
+    // The client creates the conversation up front so uploads have something to
+    // hang off, which leaves every chat titled "แชทใหม่" forever. Naming it here
+    // costs nothing extra — the first user turn is already in hand.
+    //
+    // The title predicate is the whole safety of this: it only fires while the
+    // row still holds a placeholder, so a name the user typed through PATCH is
+    // never overwritten.
+    if (userText.trim()) {
+      await db
+        .update(conversations)
+        .set({ title: deriveTitle(userText) })
+        .where(
+          and(
+            eq(conversations.id, conversationIdResolved),
+            inArray(conversations.title, [...PLACEHOLDER_TITLES]),
+          ),
+        );
+    }
 
     /* ── 4. walk the fallback chain ───────────────────────────────────────── */
     const chain = await buildFallbackChain(modelId);

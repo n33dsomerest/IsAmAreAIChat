@@ -30,7 +30,9 @@
     "test:artifacts": "node --env-file-if-exists=.env.local scripts/test-artifacts.mjs",
     "test:platform": "node --env-file-if-exists=.env.local scripts/test-platform.mjs",
     "build:icons": "node scripts/make-icons.mjs",
-    "check:secrets": "node scripts/check-secrets.mjs"
+    "check:secrets": "node scripts/check-secrets.mjs",
+    "db:titles": "node --env-file-if-exists=.env.local scripts/rename-untitled.mjs",
+    "test:titles": "node --env-file-if-exists=.env.local scripts/test-titles.mjs"
   },
   "allowScripts": {
     "@tailwindcss/oxide": true,
