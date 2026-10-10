@@ -16,13 +16,20 @@ export class ProviderConfigError extends Error {
 }
 
 export type ResolvedModel = {
-  /** `provider_models.id` — what usage rows record, not the remote id. */
+  /** `provider_models.id` - what usage rows record, not the remote id. */
   id: string;
   providerId: string;
   model: LanguageModel;
   providerName: string;
   displayName: string;
   remoteModelId: string;
+  /**
+   * Needed at generation time, not just for display: a fallback chain can run
+   * the same prompt through a dozen models with different abilities, so the
+   * caller has to know whether the current candidate can read images before it
+   * decides whether to send them.
+   */
+  capabilities: ModelCapabilities;
 };
 
 type ProviderRow = typeof providers.$inferSelect;
@@ -147,6 +154,7 @@ function toModel(row: Candidate): ResolvedModel {
     providerName: row.provider.name,
     displayName: row.displayName,
     remoteModelId: row.remoteModelId,
+    capabilities: row.capabilities ?? {},
   };
 }
 

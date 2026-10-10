@@ -8,9 +8,18 @@ import { buildFallbackChain } from '@/lib/ai/resolve';
 import { generateWithFallback } from '@/lib/ai/generate';
 import { buildToolSet } from '@/lib/ai/tool-registry';
 import { artifactTools, extractArtifacts, type Artifact } from '@/lib/chat/artifacts';
-import { DEFAULT_SYSTEM_PROMPT, PLACEHOLDER_TITLES, deriveTitle, textOf } from '@/lib/chat/history';
+import {
+  DEFAULT_SYSTEM_PROMPT,
+  MAX_INLINE_BYTES,
+  PLACEHOLDER_TITLES,
+  deriveTitle,
+  textOf,
+  type AttachmentRef,
+  type InlineAttachment,
+} from '@/lib/chat/history';
 import { db } from '@/lib/db';
-import { artifacts, conversations, messages, usageEvents } from '@/lib/db/schema';
+import { artifacts, attachments, conversations, messages, usageEvents } from '@/lib/db/schema';
+import { download, toBase64 } from '@/lib/storage';
 
 export const maxDuration = 60;
 
@@ -40,6 +49,11 @@ const requestSchema = z.object({
   webSearch: z.boolean().default(false),
   /** Lets the model produce artifacts for this turn. */
   artifacts: z.boolean().default(true),
+  /**
+   * Attachments uploaded for this turn. They were stored before the message
+   * existed, so this is where they get attached to one.
+   */
+  attachmentIds: z.array(z.string().uuid()).max(10).default([]),
 });
 
 type CreditRow = {
@@ -77,6 +91,7 @@ export async function POST(request: Request) {
     maxOutputTokens,
     webSearch,
     artifacts: wantArtifacts,
+    attachmentIds,
   } = parsed.data;
   const user = session.user;
   const uiMessages = incoming as UIMessage[];
@@ -240,17 +255,73 @@ export async function POST(request: Request) {
       .set({ updatedAt: new Date(), modelId })
       .where(eq(conversations.id, conversationIdResolved));
 
+    /* ── 3a. resolve the uploads this turn is sending ──────────────────────── */
+    // Scoped to this conversation, which is already proven to be the caller's,
+    // so an id from another user simply does not match and is dropped rather
+    // than being an error the user cannot act on.
+    const usedAttachments = attachmentIds.length
+      ? await db
+          .select({
+            id: attachments.id,
+            fileName: attachments.fileName,
+            mime: attachments.mime,
+            sizeBytes: attachments.sizeBytes,
+            kind: attachments.kind,
+            storagePath: attachments.storagePath,
+            extractedText: attachments.extractedText,
+          })
+          .from(attachments)
+          .where(
+            and(
+              inArray(attachments.id, attachmentIds),
+              eq(attachments.conversationId, conversationIdResolved),
+            ),
+          )
+      : [];
+
+    // Metadata goes on the message so history can re-render the attachment; the
+    // bytes stay in Storage and are only fetched if a model can use them.
+    const storedParts = [
+      ...(userMessage?.parts ?? []),
+      ...usedAttachments.map(
+        (a): AttachmentRef => ({
+          type: 'file',
+          attachmentId: a.id,
+          name: a.fileName ?? 'ไฟล์',
+          kind: a.kind,
+          mime: a.mime,
+          sizeBytes: a.sizeBytes,
+        }),
+      ),
+    ];
+
     const storedUser = await db
       .insert(messages)
       .values({
         conversationId: conversationIdResolved,
         role: 'user',
-        parts: userMessage?.parts ?? [],
+        parts: storedParts,
         status: 'complete',
       })
       .returning({ id: messages.id });
 
-    /* ── 3b. name the conversation after its first prompt ─────────────────── */
+    /* ── 3b. attach this turn's uploads to the message they belong to ──────── */
+    // Uploads land before the message does, so `attachments.message_id` was
+    // always NULL and nothing could ever find them again. Linking here is what
+    // makes the file renderable in history after a reload.
+    if (usedAttachments.length) {
+      await db
+        .update(attachments)
+        .set({ messageId: storedUser[0].id })
+        .where(
+          and(
+            inArray(attachments.id, usedAttachments.map((a) => a.id)),
+            eq(attachments.conversationId, conversationIdResolved),
+          ),
+        );
+    }
+
+    /* ── 3c. name the conversation after its first prompt ─────────────────── */
     // The client creates the conversation up front so uploads have something to
     // hang off, which leaves every chat titled "แชทใหม่" forever. Naming it here
     // costs nothing extra — the first user turn is already in hand.
@@ -276,6 +347,39 @@ export async function POST(request: Request) {
     // Built once per request: MCP handshakes are cached inside the client.
     const tools = await buildToolSet({ webSearch });
 
+    /* ── 4a. fetch the bytes for files a model could actually read ─────────── */
+    // Only binary files need downloading; text was extracted at upload time.
+    // The size cap is what stops a 20 MB upload from becoming a 27 MB prompt.
+    const inlineFiles = new Map<string, InlineAttachment>();
+    for (const a of usedAttachments) {
+      if (a.extractedText) {
+        inlineFiles.set(a.id, {
+          attachmentId: a.id,
+          name: a.fileName ?? 'ไฟล์',
+          kind: a.kind,
+          mime: a.mime,
+          text: a.extractedText,
+        });
+        continue;
+      }
+      if (a.sizeBytes > MAX_INLINE_BYTES) continue;
+
+      try {
+        const buffer = await download(a.storagePath, user.id);
+        inlineFiles.set(a.id, {
+          attachmentId: a.id,
+          name: a.fileName ?? 'ไฟล์',
+          kind: a.kind,
+          mime: a.mime,
+          data: toBase64(buffer),
+        });
+      } catch {
+        // A file that cannot be read must not fail the whole message — the
+        // text still goes through and toModelMessages notes the omission.
+        console.error('[chat] attachment unreadable:', a.storagePath);
+      }
+    }
+
     // Artifacts created by the tool land here and are streamed as their own
     // parts so the renderer can put them beside the prose.
     const produced: Artifact[] = [];
@@ -290,6 +394,7 @@ export async function POST(request: Request) {
       temperature,
       maxOutputTokens,
       tools,
+      files: inlineFiles,
       abortSignal: abortController.signal,
       onAttemptFailed: (_model, error) => {
         failures.push(error instanceof Error ? error.message : String(error));

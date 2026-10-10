@@ -33,7 +33,8 @@
     "check:secrets": "node scripts/check-secrets.mjs",
     "db:titles": "node --env-file-if-exists=.env.local scripts/rename-untitled.mjs",
     "test:titles": "node --env-file-if-exists=.env.local scripts/test-titles.mjs",
-    "test:sidebar": "node --env-file-if-exists=.env.local scripts/test-sidebar.mjs"
+    "test:sidebar": "node --env-file-if-exists=.env.local scripts/test-sidebar.mjs",
+    "test:attachments": "node --env-file-if-exists=.env.local scripts/test-attachments.mjs"
   },
   "allowScripts": {
     "@tailwindcss/oxide": true,

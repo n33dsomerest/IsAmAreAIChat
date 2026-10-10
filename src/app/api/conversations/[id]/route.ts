@@ -4,7 +4,8 @@ import { z } from 'zod';
 
 import { requireUser } from '@/lib/api/auth';
 import { db } from '@/lib/db';
-import { conversations, messages } from '@/lib/db/schema';
+import { attachments, conversations, messages } from '@/lib/db/schema';
+import { remove } from '@/lib/storage';
 
 type StoredMessage = {
   id: string;
@@ -150,8 +151,22 @@ export async function DELETE(_request: NextRequest, { params }: { params: Promis
     return NextResponse.json({ error: 'not_found' }, { status: 404 });
   }
 
+  // Storage objects do not cascade with the row, so the paths are collected
+  // before the delete — afterwards there is nothing left to query.
+  const paths = (
+    await db
+      .select({ storagePath: attachments.storagePath })
+      .from(attachments)
+      .where(eq(attachments.conversationId, id))
+  ).map((a) => a.storagePath);
+
   // Messages, attachments and tool rows all cascade from here.
   await db.delete(conversations).where(eq(conversations.id, id));
+
+  // Best effort: the conversation is already gone, so a storage hiccup must not
+  // turn a successful delete into an error the user sees.
+  await Promise.all(paths.map((p) => remove(p, session.user.id)));
+
   return NextResponse.json({ ok: true });
 }
 

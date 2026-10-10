@@ -2,7 +2,7 @@ import 'server-only';
 
 import { streamText, type LanguageModel, type TextStreamPart, type ToolSet, type UIMessage } from 'ai';
 
-import { toModelMessages } from '@/lib/chat/history';
+import { toModelMessages, type InlineAttachment } from '@/lib/chat/history';
 import { DEFAULT_SYSTEM_PROMPT } from '@/lib/chat/history';
 import type { ResolvedModel } from '@/lib/ai/resolve';
 
@@ -56,6 +56,7 @@ export async function generateWithFallback({
   maxOutputTokens,
   abortSignal,
   tools,
+  files,
   onAttemptFailed,
 }: {
   chain: ResolvedModel[];
@@ -65,18 +66,27 @@ export async function generateWithFallback({
   maxOutputTokens?: number;
   abortSignal?: AbortSignal;
   tools?: ToolSet;
+  /** Attachment payloads, keyed by id, for messages that carry files. */
+  files?: Map<string, InlineAttachment>;
   onAttemptFailed?: (model: ResolvedModel, error: unknown) => void;
 }): Promise<GenerateResult> {
   if (!chain.length) {
     throw new NonRetryableError('No models are currently available.');
   }
 
-  const modelMessages = toModelMessages(messages);
   const failures: string[] = [];
   const budget = Math.min(chain.length, MAX_ATTEMPTS);
 
   for (let i = 0; i < budget; i++) {
     const candidate = chain[i];
+
+    // Rebuilt per candidate, not once up front: the chain mixes models with and
+    // without vision, and sending an image to one that cannot read it would
+    // fail the request instead of falling through to the next model.
+    const modelMessages = toModelMessages(messages, {
+      files,
+      capabilities: candidate.capabilities,
+    });
 
     try {
       const result = streamText({

@@ -3,7 +3,8 @@ import { asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { messages } from '@/lib/db/schema';
 import { SITE } from '@/lib/site-config';
-import type { UIMessage } from 'ai';
+import type { FilePart, ModelMessage, TextPart, UIMessage } from 'ai';
+import type { ModelCapabilities } from '@/lib/db/schema';
 
 export const DEFAULT_SYSTEM_PROMPT = `You are ${SITE.name}, a helpful AI assistant.
 
@@ -12,27 +13,128 @@ table over a paragraph when it is clearer. If you are unsure about something, sa
 so rather than guessing.`;
 
 /**
- * Turns stored UI message parts back into the plain text the model API wants.
+ * An attachment as it is stored on the user message and re-rendered in history.
+ * Only the metadata lives in `messages.parts`; the bytes stay in Storage.
+ */
+export type AttachmentRef = {
+  type: 'file';
+  attachmentId: string;
+  name: string;
+  kind: 'image' | 'pdf' | 'text';
+  mime: string;
+  sizeBytes: number;
+};
+
+/** An attachment loaded from Storage and ready to hand to a model. */
+export type InlineAttachment = {
+  attachmentId: string;
+  name: string;
+  kind: 'image' | 'pdf' | 'text';
+  mime: string;
+  /** base64 payload — present for images and PDFs small enough to inline. */
+  data?: string;
+  /** Text pulled out at upload time, for files no model reads as binary. */
+  text?: string;
+};
+
+/** Raw bytes above this are not sent to a model; the prompt would be absurd. */
+export const MAX_INLINE_BYTES = 4 * 1024 * 1024;
+
+/** Pulls the attachment refs back out of a message's stored parts. */
+export function attachmentRefs(parts: unknown): AttachmentRef[] {
+  if (!Array.isArray(parts)) return [];
+  return parts.filter(
+    (p): p is AttachmentRef =>
+      typeof p === 'object' &&
+      p !== null &&
+      (p as { type?: string }).type === 'file' &&
+      typeof (p as { attachmentId?: string }).attachmentId === 'string',
+  );
+}
+
+/**
+ * Turns stored UI message parts into what the model API wants.
  *
  * Tool calls and result parts are dropped on purpose: they are UI-only here and
  * replaying them to a fresh request would produce invalid history.
+ *
+ * Attachments are handled per model. A fallback chain runs one prompt through
+ * every enabled model, and most of them cannot read an image, so the same
+ * message is rebuilt for each candidate: where a model has no vision the image
+ * is replaced by a note naming it rather than being sent and rejected. Text
+ * files are inlined as text because every model can read those.
  */
-export function toModelMessages(history: UIMessage[]): {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}[] {
-  const out: { role: 'system' | 'user' | 'assistant'; content: string }[] = [];
+export function toModelMessages(
+  history: UIMessage[],
+  options: {
+    files?: Map<string, InlineAttachment>;
+    capabilities?: Partial<ModelCapabilities>;
+  } = {},
+): ModelMessage[] {
+  const { files, capabilities } = options;
+  const out: ModelMessage[] = [];
 
   for (const message of history) {
+    if (message.role !== 'user' && message.role !== 'assistant') continue;
+
     const text = message.parts
       .filter((p): p is { type: 'text'; text: string } => p.type === 'text')
       .map((p) => p.text)
       .join('\n')
       .trim();
 
-    if (!text) continue;
-    if (message.role === 'user' || message.role === 'assistant') {
-      out.push({ role: message.role, content: text });
+    const refs = attachmentRefs(message.parts);
+    const inline = refs
+      .map((r) => files?.get(r.attachmentId))
+      .filter((f): f is InlineAttachment => Boolean(f));
+
+    const content: Array<TextPart | FilePart> = [];
+    if (text) content.push({ type: 'text', text });
+
+    for (const file of inline) {
+      // Plain text and extracted documents work on every model.
+      if (file.text) {
+        content.push({
+          type: 'text',
+          text: `<file name="${file.name}">\n${file.text}\n</file>`,
+        });
+        continue;
+      }
+
+      const canRead =
+        file.kind === 'image'
+          ? capabilities?.vision
+          : file.kind === 'pdf'
+            ? capabilities?.pdf
+            : false;
+
+      if (canRead && file.data) {
+        content.push({
+          type: 'file',
+          data: file.data,
+          mediaType: file.mime,
+          filename: file.name,
+        });
+      } else if (capabilities?.vision || capabilities?.pdf) {
+        // The model reads files, just not this one — say why rather than
+        // dropping it silently.
+        const why =
+          !file.data && !file.text
+            ? 'too large to send'
+            : file.kind === 'pdf'
+              ? 'this model cannot read PDF files'
+              : 'this model cannot see images';
+        content.push({ type: 'text', text: `[attached "${file.name}" — omitted: ${why}]` });
+      }
+    }
+
+    if (!content.length) continue;
+    // A single text part stays a plain string: it is what every provider is
+    // happiest with, and it keeps the request small.
+    if (content.length === 1 && content[0].type === 'text') {
+      out.push({ role: message.role, content: content[0].text });
+    } else {
+      out.push({ role: message.role, content });
     }
   }
 

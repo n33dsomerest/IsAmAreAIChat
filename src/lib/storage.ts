@@ -97,4 +97,15 @@ export async function remove(path: string, userId: string): Promise<void> {
   await supabase.storage.from(BUCKET).remove([path]);
 }
 
+/**
+ * base64 for handing bytes to a model inline.
+ *
+ * OpenAI-compatible endpoints take multimodal input as a data URL rather than a
+ * fetchable link, so the file has to travel inside the request. Node only —
+ * this is never called from a component.
+ */
+export function toBase64(buffer: ArrayBuffer): string {
+  return Buffer.from(new Uint8Array(buffer)).toString('base64');
+}
+
 export { BUCKET };

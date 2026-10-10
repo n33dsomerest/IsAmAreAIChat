@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   ArrowUp,
   Download,
@@ -19,9 +19,11 @@ import useSWR from 'swr';
 import { toast } from 'sonner';
 
 import type { Artifact } from '@/lib/chat/artifacts';
+import type { AttachmentRef } from '@/lib/chat/history';
 
 import { ArtifactCard } from '@/components/chat/artifact-card';
 import { CONVERSATIONS_KEY } from '@/components/chat/conversation-list';
+import { AttachmentList } from '@/components/chat/attachment-list';
 import { ModelPicker, type PickerModel } from '@/components/chat/model-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -30,7 +32,8 @@ import { Textarea } from '@/components/ui/textarea';
 type Part =
   | { type: 'text'; text: string }
   | { type: 'reasoning'; text: string }
-  | { type: 'artifact'; artifact: Artifact };
+  | { type: 'artifact'; artifact: Artifact }
+  | AttachmentRef;
 
 type Turn = {
   id: string;
@@ -40,7 +43,13 @@ type Turn = {
   branchCount?: number;
 };
 
-type PendingFile = { id: string; name: string; kind: string; sizeBytes: number };
+type PendingFile = {
+  id: string;
+  name: string;
+  kind: string;
+  mime: string;
+  sizeBytes: number;
+};
 
 type Status =
   | { kind: 'idle' }
@@ -81,6 +90,10 @@ const router = useRouter();
   const [webSearch, setWebSearch] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Read by the stream callback, which is memoised and must not re-create itself
+  // every time a file is added or removed.
+  const attachmentIdsRef = useRef<string[]>([]);
+  attachmentIdsRef.current = files.map((f) => f.id);
   // Drag-and-drop target state. The counter is what makes the highlight stable:
   // dragenter/dragleave fire for every child element the pointer crosses, so a
   // boolean would flicker the overlay off the moment it moved over the textarea.
@@ -116,7 +129,9 @@ const appendTo = useCallback((id: string, part: Part) => {
               parts:
                 part.type === 'artifact'
                   ? [...t.parts, part]
-                  : mergeText(t.parts, part.type, part.text),
+                  : part.type === 'file'
+                    ? [...t.parts, part]
+                    : mergeText(t.parts, part.type, part.text),
             }
           : t,
       ),
@@ -146,6 +161,7 @@ const appendTo = useCallback((id: string, part: Part) => {
             modelId,
             webSearch: withSearch,
             messages: history.map((t) => ({ role: t.role, parts: t.parts })),
+            attachmentIds: attachmentIdsRef.current,
           }),
           signal: controller.signal,
         });
@@ -229,7 +245,26 @@ if (event.type === 'reasoning-delta')
     const target = await ensureConversation();
     if (!target) return;
 
-    const userTurn: Turn = { id: nextId(), role: 'user', parts: [{ type: 'text', text }] };
+    // The pending files ride this one request and are cleared with it, so a
+    // later message in the same chat does not re-send them. The turn keeps them
+    // as parts, which is what history renders from after a reload.
+    const userTurn: Turn = {
+      id: nextId(),
+      role: 'user',
+      parts: [
+        ...(text ? [{ type: 'text' as const, text }] : []),
+        ...files.map(
+          (f): AttachmentRef => ({
+            type: 'file',
+            attachmentId: f.id,
+            name: f.name,
+            kind: f.kind as AttachmentRef['kind'],
+            mime: f.mime,
+            sizeBytes: f.sizeBytes,
+          }),
+        ),
+      ],
+    };
     const botId = nextId();
     const history = [...turns, userTurn];
 
@@ -237,7 +272,7 @@ if (event.type === 'reasoning-delta')
     setInput('');
     setFiles([]);
     await stream(history, botId, target, webSearch);
-  }, [ensureConversation, files.length, input, modelId, nextId, status.kind, stream, turns, webSearch]);
+  }, [ensureConversation, files, input, modelId, nextId, status.kind, stream, turns, webSearch]);
 
   /** Forks a turn server-side, then regenerates from that point. */
   async function forkFrom(turnId: string, replacement?: string) {
@@ -309,6 +344,24 @@ if (event.type === 'reasoning-delta')
   }
 
   const busy = status.kind === 'streaming';
+
+  /**
+   * What the currently selected model will not be able to read, if anything.
+   *
+   * Shown before sending rather than acted on: the user picks the model, so
+   * quietly swapping it for one with vision would be worse than telling them.
+   */
+  const unreadable = useMemo(() => {
+    const model = models.find((m) => m.id === modelId);
+    if (!model || !files.length) return [];
+
+    const caps = model.capabilities ?? {};
+    return files.filter((f) => {
+      if (f.kind === 'image') return !caps.vision;
+      if (f.kind === 'pdf') return !caps.pdf;
+      return false;
+    });
+  }, [files, modelId, models]);
 
   /** Only react to drags that actually carry files, not selected text. */
   const carriesFiles = (e: React.DragEvent) =>
@@ -463,6 +516,21 @@ if (event.type === 'reasoning-delta')
             </div>
           )}
 
+          {unreadable.length > 0 && (
+            <p className="mb-2 flex items-start gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0 text-amber-600 dark:text-amber-400" />
+              <span>
+                <strong>{models.find((m) => m.id === modelId)?.label ?? 'โมเดลนี้'}</strong>{' '}
+                อ่านไฟล์ที่แนบไม่ได้
+                {unreadable.some((f) => f.kind === 'image') && ' (มองไม่เห็นรูป)'}
+                {unreadable.some((f) => f.kind === 'pdf') && ' (อ่าน PDF ไม่ได้)'}
+                {' — '}
+                {unreadable.map((f) => f.name).join(', ')} จะถูกส่งเป็นข้อความแทน
+                ถ้าอยากให้โมเดลเห็นไฟล์ เลือกโมเดลที่รองรับก่อนส่ง
+              </span>
+            </p>
+          )}
+
           <div className="rounded-xl border bg-background focus-within:ring-2 focus-within:ring-ring/40">
             <Textarea
               value={input}
@@ -556,8 +624,14 @@ if (event.type === 'reasoning-delta')
 
 function TurnView({ turn, streaming }: { turn: Turn; streaming: boolean }) {
   if (turn.role === 'user') {
+    const files = turn.parts.filter((p): p is AttachmentRef => p.type === 'file');
     return (
-      <div className="flex justify-end">
+      <div className="flex flex-col items-end gap-1">
+        {files.length > 0 && (
+          <div className="flex max-w-[85%] justify-end">
+            <AttachmentList items={files} />
+          </div>
+        )}
         <div className="bg-primary text-primary-foreground max-w-[85%] rounded-2xl rounded-br-sm px-4 py-2.5 text-sm whitespace-pre-wrap">
           {turn.parts.map((p, i) => (p.type === 'text' ? <span key={i}>{p.text}</span> : null))}
         </div>
