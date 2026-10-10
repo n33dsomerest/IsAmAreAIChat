@@ -58,11 +58,6 @@ export default async function PricingPage() {
                 pkg.featured && 'border-primary shadow-md',
               )}
             >
-              {pkg.featured && (
-                <Badge className="absolute -top-2.5 left-1/2 -translate-x-1/2">
-                  คุ้มค่าที่สุด
-                </Badge>
-              )}
 
               <CardContent className="flex flex-1 flex-col gap-4">
                 <div>
