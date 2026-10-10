@@ -68,7 +68,7 @@ try {
   check('new conversation starts as a placeholder', (await titleOf(cid)) === 'แชทใหม่');
 
   const firstPrompt = 'ช่วยแนะนำร้านกาแฟใกล้ฉัน';
-  const r1 = await ask(cid, firstPrompt);
+  await ask(cid, firstPrompt);
   check(
     'placeholder is replaced by the first prompt',
     (await titleOf(cid)) === firstPrompt,
@@ -76,7 +76,7 @@ try {
   );
 
   // 2. A later message must not re-title it.
-  const r2 = await ask(cid, 'แล้วอีกที่นึงล่ะ');
+  await ask(cid, 'แล้วอีกที่นึงล่ะ');
   check('a second message does not re-title', (await titleOf(cid)) === firstPrompt);
 
   // 3. A name the user chose must survive further messages.
@@ -87,7 +87,7 @@ try {
   });
   check('rename via PATCH works', patch.ok);
 
-  const r3 = await ask(cid, 'ครั้งนี้ข้อความยาวมากกว่าเดิม');
+  await ask(cid, 'ครั้งนี้ข้อความยาวมากกว่าเดิม');
   check(
     'a user-chosen title is never overwritten',
     (await titleOf(cid)) === 'ชื่อที่ผมตั้งเอง',

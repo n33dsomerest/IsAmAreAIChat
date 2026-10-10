@@ -15,11 +15,13 @@ import {
   X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { toast } from 'sonner';
 
 import type { Artifact } from '@/lib/chat/artifacts';
 
 import { ArtifactCard } from '@/components/chat/artifact-card';
+import { CONVERSATIONS_KEY } from '@/components/chat/conversation-list';
 import { ModelPicker, type PickerModel } from '@/components/chat/model-picker';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -74,6 +76,7 @@ const router = useRouter();
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const { mutate: mutateConversations } = useSWR(CONVERSATIONS_KEY);
 
   const [webSearch, setWebSearch] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
@@ -183,6 +186,10 @@ if (event.type === 'reasoning-delta')
           }
         }
         setStatus({ kind: 'idle' });
+        // The sidebar reads its own cache, so refresh() would not reach it.
+        // Revalidating the conversations key is what makes a new chat — or the
+        // title the server just derived from the first prompt — appear there.
+        void mutateConversations();
         router.refresh();
       } catch (error) {
         setTurns((prev) => prev.filter((t) => t.id !== botId));
@@ -194,7 +201,7 @@ if (event.type === 'reasoning-delta')
         abortRef.current = null;
       }
     },
-    [appendTo, modelId, router],
+    [appendTo, modelId, mutateConversations, router],
   );
 
   /**
