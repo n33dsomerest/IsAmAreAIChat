@@ -236,10 +236,10 @@ node scripts/crop-qr.mjs
 | `npm run admin:promote -- <ชื่อ>` | ตั้งผู้ใช้เป็น admin |
 | `npm run admin:sync-models` | ดึงแคตตาล็อกโมเดลจาก provider ทุกตัว (`--all` / `--none` เปลี่ยนว่าเปิดใช้อะไร) |
 | `npm run test:e2e` | ทดสอบ 12 เคสผ่านเว็บจริง (ต้องรัน `npm start` ก่อน) |
-| `npm run test:chat` | ????? 17 ???: ???????????? provider + ????????? + usage row |
-| `npm run db:test-usage` | ????? 15 ???: ????????????????????? + ??????????????? |
+| `npm run test:chat` | ทดสอบ 17 เคส: สตรีมจริงจาก provider + หักเครดิต + usage row |
+| `npm run db:test-usage` | ทดสอบ 15 เคส: คืนเครดิตเมื่อล้มเหลว + กู้โควตาวันนั้น |
 | `npm run test:ai` | ทดสอบ 21 เคส: แคตตาล็อกโมเดล · admin gate · เปิด/ปิดโมเดล · ลำดับ fallback |
-| `npm run test:payments` | ????? 18 ???: ??????? � ???? � ?????????? (????? SlipOK ????) |
+| `npm run test:payments` | ทดสอบ 18 เคส: ออเดอร์ · สลิป · กันสลิปซ้ำ (เรียก SlipOK จริง) |
 | `npm run test:conversations` | ทดสอบ 24 เคส: ประวัติ · branching · export · cascade |
 | `npm run test:tools` | ทดสอบ 21 เคส: ไฟล์แนบ · storage · เครื่องมือ · MCP (stub server จริง) |
 | `npm run test:artifacts` | ทดสอบ 17 เคส: แยก artifact จากข้อความ + เก็บลงฐานข้อมูล |
@@ -263,24 +263,33 @@ node scripts/crop-qr.mjs
 - [x] **เฟส 1** — scaffold · schema 18 ตาราง · RLS · credit engine · UI shell · QR
 - [x] **เฟส 2** — auth (username/password + Google) · free tier quota · middleware
 - [x] **เฟส 3** — provider layer + fallback chain
-- [ ] **เฟส 4** — `/api/chat` streaming + หักเครดิตจริง ⭐
-- [ ] **เฟส 5** — SlipOK ตรวจสลีป + ให้เครดิตอัตโนมัติ ⭐
+- [x] **เฟส 4** — `/api/chat` streaming + หักเครดิตจริง ⭐
+- [x] **เฟส 5** — SlipOK ตรวจสลีป + ให้เครดิตอัตโนมัติ ⭐
 - [x] **เฟส 6** — จัดการแชท (branching, folders, export)
 - [x] **เฟส 7** — ไฟล์ + web search + MCP
 - [x] **เฟส 8** — Artifacts / Canvas
 - [x] **เฟส 9** — admin dashboard + i18n + PWA + deploy
+
 ## Deploy
 
-1. Push and let Vercel build. DATABASE_URL, the Supabase keys, the provider
+1. Push and let Vercel build. `DATABASE_URL`, the Supabase keys, the provider
    keys and the SlipOK credentials are server-only — set them in the project's
    Environment Variables, never in a committed file.
-2. If the DB password contains $, write it percent-encoded (%24) inside
+2. If the DB password contains `$`, write it percent-encoded (`%24`) inside
    quotes. Vercel and Next expand it otherwise and the connection fails.
-3. Run 
-pm run db:migrate once against the production database.
-4. Run 
-pm run admin:sync-models to seed the provider catalogue, then
-   
-pm run admin:promote -- <username> for the first admin.
-5. SlipOK must have the PromptPay receiver matching the QR in public/qr/,
+3. Run `npm run db:migrate` once against the production database.
+4. Run `npm run admin:sync-models` to seed the provider catalogue, then
+   `npm run admin:promote -- <username>` for the first admin.
+5. SlipOK must have the PromptPay receiver matching the QR in `public/qr/`,
    or every slip comes back as error 1014.
+
+## Security notes
+
+Secrets that have been shared in chat at any point must be rotated before the
+site goes live:
+
+- `SLIPOK_API_KEY` — a key in the transcript grants 100 free slip checks
+- `GOOGLE_CLIENT_SECRET` — allows impersonating the OAuth client
+
+Both live only in `.env` / `.env.local`, which are gitignored. Never copy a
+real value into `.env.example`.
