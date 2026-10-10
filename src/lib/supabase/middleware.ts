@@ -48,6 +48,19 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname, search } = request.nextUrl;
+
+  // A PKCE `code` only means something at /auth/callback, which is the one
+  // place that exchanges it for a session. Supabase sends it to whatever the
+  // project's Site URL is, so if that is set to the root the code would
+  // otherwise be carried into /login as a dead `next` and the email link would
+  // silently fail to sign anyone in. Forward it instead of losing it.
+  if (pathname !== '/auth/callback' && request.nextUrl.searchParams.has('code')) {
+    const url = request.nextUrl.clone();
+    url.pathname = '/auth/callback';
+    url.search = search;
+    return NextResponse.redirect(url);
+  }
+
   const isPublic = PUBLIC_PATHS.some(
     (p) => pathname === p || pathname.startsWith(`${p}/`),
   );
