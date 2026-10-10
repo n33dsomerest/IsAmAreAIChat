@@ -2,10 +2,6 @@
 
 import { AlertTriangle, ExternalLink } from 'lucide-react';
 
-const isAuthPage = () =>
-  typeof window !== 'undefined' &&
-  ['/login', '/register'].some((p) => window.location.pathname.startsWith(p));
-
 /**
  * The two Supabase dashboard settings this auth flow silently depends on.
  *
@@ -14,9 +10,15 @@ const isAuthPage = () =>
  * 2. Google needs Supabase's OWN callback URL registered, not the app's. The
  *    browser lands on `/auth/callback`, but the redirect_uri Google actually
  *    validates is `https://<ref>.supabase.co/auth/v1/callback`.
+ *
+ * Development only. `NODE_ENV` is inlined at build time, so the server and the
+ * client agree on the answer — reading `window.location` here instead would
+ * make the two sides disagree and trip a hydration mismatch. It is also the
+ * right audience: once the project is set up, a real user has no business
+ * seeing a Supabase configuration checklist.
  */
 export function AuthSetupNotice() {
-  if (!isAuthPage()) return null;
+  if (process.env.NODE_ENV !== 'development') return null;
 
   const supabaseRef =
     process.env.NEXT_PUBLIC_SUPABASE_URL?.split('//')[1]?.split('.')[0] ?? '';

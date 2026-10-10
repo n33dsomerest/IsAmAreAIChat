@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useSyncExternalStore } from 'react';
 
 export type Locale = 'th' | 'en';
 
@@ -92,30 +92,43 @@ const I18nContext = createContext<I18n>({
 });
 
 /**
- * Reads the stored preference without touching state, so the provider can seed
- * it during the first client render instead of cascading a second render from
- * an effect.
+ * localStorage is the single source of truth for the locale, so it is read
+ * through `useSyncExternalStore` rather than mirrored into state. That store is
+ * built for exactly this case: the server has no localStorage, and
+ * `getServerSnapshot` is what React renders *and* hydrates against, so the
+ * markup matches and the stored preference swaps in immediately afterwards.
+ * Doing it with `useState` + an effect instead either costs a second render or,
+ * if the state is seeded during render, produces a hydration mismatch.
  */
-function readStoredLocale(): Locale | null {
-  if (typeof window === 'undefined') return null;
+const listeners = new Set<() => void>();
+
+function subscribe(onChange: () => void) {
+  listeners.add(onChange);
+  // The `storage` event only fires in other tabs, so it is a bonus for keeping
+  // two open tabs in step — not the in-tab notification path.
+  window.addEventListener('storage', onChange);
+  return () => {
+    listeners.delete(onChange);
+    window.removeEventListener('storage', onChange);
+  };
+}
+
+function readStoredLocale(): Locale {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved === 'th' || saved === 'en') return saved;
   return navigator.language.slice(0, 2).toLowerCase() === 'th' ? 'th' : 'en';
 }
 
+function writeStoredLocale(next: Locale) {
+  localStorage.setItem(STORAGE_KEY, next);
+  for (const onChange of listeners) onChange();
+}
+
+/** The server has no localStorage, so it always renders Thai. */
+const serverLocale: Locale = 'th';
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  // The server has no localStorage, so it renders Thai and the first client
-  // render must match it. Reading the preference lazily on the second render
-  // avoids the cascading setState an effect would cause.
-  const [stored, setStored] = useState<Locale | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-
-  if (typeof window !== 'undefined' && !hydrated) {
-    setHydrated(true);
-    setStored(readStoredLocale());
-  }
-
-  const locale = stored ?? 'th';
+  const locale = useSyncExternalStore(subscribe, readStoredLocale, () => serverLocale);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -124,10 +137,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const value: I18n = {
     locale,
     t: (key) => MESSAGES[locale][key] ?? MESSAGES.th[key] ?? key,
-    setLocale: (next) => {
-      localStorage.setItem(STORAGE_KEY, next);
-      setStored(next);
-    },
+    setLocale: writeStoredLocale,
   };
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
