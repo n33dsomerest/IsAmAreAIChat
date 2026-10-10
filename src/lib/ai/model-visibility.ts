@@ -1,10 +1,24 @@
 import { and, eq } from 'drizzle-orm';
 
+import { isCuratedOpenRouter } from '@/lib/ai/model-curation';
 import { db } from '@/lib/db';
 import { providerModels } from '@/lib/db/schema';
 import { isFreeModelId } from '@/lib/ai/sync-models';
 
 export type SyncMode = 'free' | 'all' | 'none';
+
+/** Stable id of the OpenRouter provider row, as seeded by the sync script. */
+const OPENROUTER_PROVIDER_ID = 'openrouter';
+
+/**
+ * OpenRouter offers several hundred no-cost variants, so "enable everything
+ * free" is not a usable default — it puts a wall of models nobody chose in the
+ * picker. The curated allowlist is the editorial answer.
+ */
+function defaultEnabled(providerId: string, remoteModelId: string): boolean {
+  if (providerId === OPENROUTER_PROVIDER_ID) return isCuratedOpenRouter(remoteModelId);
+  return isFreeModelId(remoteModelId);
+}
 
 /**
  * Decides which synced models are live.
@@ -16,14 +30,17 @@ export type SyncMode = 'free' | 'all' | 'none';
  */
 export async function applySyncMode(providerId: string, mode: SyncMode) {
   const rows = await db
-    .select({ id: providerModels.id, remoteModelId: providerModels.remoteModelId })
+    .select({
+      id: providerModels.id,
+      remoteModelId: providerModels.remoteModelId,
+    })
     .from(providerModels)
     .where(eq(providerModels.providerId, providerId));
 
   let enabled = 0;
   for (const row of rows) {
     const shouldEnable =
-      mode === 'all' ? true : mode === 'none' ? false : isFreeModelId(row.remoteModelId);
+      mode === 'all' ? true : mode === 'none' ? false : defaultEnabled(providerId, row.remoteModelId);
 
     if (shouldEnable) {
       await db

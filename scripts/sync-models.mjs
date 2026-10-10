@@ -64,12 +64,23 @@ function modeFor(provider) {
 }
 
 /** Minimal port of src/lib/ai/sync-models.ts — this script runs outside Next. */
+import { curatedLabel, isCuratedOpenRouter } from '../src/lib/ai/model-curation.ts';
+
 function num(v) {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) ? n : null;
 }
 
 const isFree = (id) => id.endsWith(':free') || id === 'openrouter/free';
+
+/**
+ * Mirrors `defaultEnabled` in src/lib/ai/model-visibility.ts. OpenRouter is
+ * curated to a chosen few; other providers fall back to "everything free".
+ */
+function defaultEnabled(providerName, remoteModelId) {
+  if (providerName === 'openrouter') return isCuratedOpenRouter(remoteModelId);
+  return isFree(remoteModelId);
+}
 
 function normalize(raw) {
   const id = typeof raw.id === 'string' ? raw.id : null;
@@ -87,7 +98,7 @@ function normalize(raw) {
 
   return {
     remoteModelId: id,
-    displayName: typeof raw.name === 'string' && raw.name ? raw.name : id,
+    displayName: curatedLabel(id, typeof raw.name === 'string' && raw.name ? raw.name : id),
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
     maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
     capabilities: {
@@ -169,8 +180,8 @@ async function sync(providerId, provider) {
   for (const m of remote) {
     seen.add(m.remoteModelId);
     const prev = byRemote.get(m.remoteModelId);
-    const free = isFree(m.remoteModelId);
-    const enabled = mode === 'all' ? true : mode === 'none' ? false : free;
+    const enabled =
+      mode === 'all' ? true : mode === 'none' ? false : defaultEnabled(provider.name, m.remoteModelId);
 
     if (prev) {
       await SQL`
@@ -202,7 +213,14 @@ async function sync(providerId, provider) {
   }
 
   const freeCount = remote.filter((m) => isFree(m.remoteModelId)).length;
-  const enabledCount = mode === 'none' ? 0 : mode === 'all' ? remote.length : freeCount;
+  // Counted from the same rule that wrote the rows, so the summary cannot
+  // report a different number than the one the loop actually applied.
+  const enabledCount =
+    mode === 'none'
+      ? 0
+      : mode === 'all'
+        ? remote.length
+        : remote.filter((m) => defaultEnabled(provider.name, m.remoteModelId)).length;
   console.log(
     `  ✓ ${label}: discovered ${remote.length} (${freeCount} free) · mode=${mode} → enabled ${enabledCount}` +
       ` · +${inserted} new, ${updated} updated, ${gone.length} disabled`,

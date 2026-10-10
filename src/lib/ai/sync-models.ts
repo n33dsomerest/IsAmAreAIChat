@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 
+import { curatedLabel } from '@/lib/ai/model-curation';
 import { db } from '@/lib/db';
 import { providers, providerModels } from '@/lib/db/schema';
 import type { ModelCapabilities, ModelPricing } from '@/lib/db/schema';
@@ -102,7 +103,7 @@ export function normalizeModel(raw: RawModel): RemoteModel | null {
 
   return {
     remoteModelId: id,
-    displayName: str(raw.name) ?? id,
+    displayName: curatedLabel(id, str(raw.name) ?? id),
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
     // `max_tokens` is OpenRouter's per-model ceiling; some gateways only report
     // it per upstream provider, hence the second source.
