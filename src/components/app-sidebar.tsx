@@ -37,6 +37,12 @@ type AppSidebarProps = {
   isAdmin?: boolean;
   /** Highlights the current conversation in the list. */
   activeId?: string;
+  /**
+   * Called when something in the sidebar navigates. The mobile sheet passes
+   * its close handler here: without it, tapping a link would navigate but
+   * leave the sheet covering the page it just opened.
+   */
+  onNavigate?: () => void;
   className?: string;
 };
 
@@ -46,6 +52,7 @@ export function AppSidebar({
   username,
   isAdmin = false,
   activeId,
+  onNavigate,
   className,
 }: AppSidebarProps) {
   const router = useRouter();
@@ -53,6 +60,7 @@ export function AppSidebar({
   async function signOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
+    onNavigate?.();
     router.replace('/login');
     router.refresh();
   }
@@ -63,6 +71,12 @@ export function AppSidebar({
         'bg-sidebar text-sidebar-foreground flex h-full w-64 shrink-0 flex-col border-r',
         className,
       )}
+      // One handler instead of one per link: `closest` covers anchors that wrap
+      // their own children, and a link added later cannot forget to close the
+      // mobile sheet. Sign-out is a button, so it calls onNavigate directly.
+      onClick={(event) => {
+        if ((event.target as HTMLElement).closest('a')) onNavigate?.();
+      }}
     >
       <div className="flex items-center gap-2 px-3 py-3">
         <Link href="/" className="flex min-w-0 items-center gap-2">
