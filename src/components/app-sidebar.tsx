@@ -69,7 +69,7 @@ export function AppSidebar({
           <span className="bg-primary text-primary-foreground grid size-7 shrink-0 place-items-center rounded-md">
             <Sparkles className="size-4" />
           </span>
-          <span className="truncate text-sm font-semibold">{SITE.name}</span>
+          <span className="truncate text-sm font-semibold">IS AM ARE</span>
         </Link>
 
         <div className="ml-auto">
