@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import {
   ArrowUp,
   Download,
@@ -46,9 +46,6 @@ type Status =
   | { kind: 'error'; message: string }
   | { kind: 'offline'; message: string };
 
-let seq = 0;
-const nextId = () => `t${Date.now().toString(36)}${(seq++).toString(36)}`;
-
 export function ChatView({
   conversationId,
   models,
@@ -62,7 +59,14 @@ export function ChatView({
   initialModelId: string | null;
   initialTurns: Turn[];
 }) {
-  const router = useRouter();
+const router = useRouter();
+  const idPrefix = useId();
+  const seqRef = useRef(0);
+  // Turn ids only need to be unique within this component instance. A clock
+  // would do it, but `Date.now()` is a value Next refuses to prerender, so the
+  // id is built from React's SSR-safe `useId` plus a per-instance counter.
+  const nextId = useCallback(() => `${idPrefix}-${seqRef.current++}`, [idPrefix]);
+
   const [modelId, setModelId] = useState<string | null>(initialModelId ?? models[0]?.id ?? null);
   const [input, setInput] = useState('');
   const [turns, setTurns] = useState<Turn[]>(initialTurns);
@@ -198,7 +202,7 @@ if (event.type === 'reasoning-delta')
     setInput('');
     setFiles([]);
     await stream(history, botId, target, webSearch);
-  }, [conversationId, files.length, input, modelId, router, status.kind, stream, turns, webSearch]);
+  }, [conversationId, files.length, input, modelId, nextId, router, status.kind, stream, turns, webSearch]);
 
   /** Forks a turn server-side, then regenerates from that point. */
   async function forkFrom(turnId: string, replacement?: string) {

@@ -2,6 +2,9 @@ import { ChatView } from '@/components/chat/chat-view';
 import { getCurrentUser } from '@/lib/auth/current-user';
 import { listSelectableModels } from '@/lib/ai/resolve';
 
+/** Credits and the model catalogue are per-request, so blocking is expected. */
+export const instant = false;
+
 export default async function HomePage() {
   const [user, models] = await Promise.all([getCurrentUser(), listSelectableModels()]);
 

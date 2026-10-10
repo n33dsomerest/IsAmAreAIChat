@@ -14,6 +14,9 @@ export const metadata = {
   title: 'ราคา',
 };
 
+/** The catalogue and the signed-in user are both per-request. */
+export const instant = false;
+
 /** Reads the catalogue from the database so the page and the orders API cannot drift. */
 export default async function PricingPage() {
   const [user, rows] = await Promise.all([

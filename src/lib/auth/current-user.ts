@@ -1,4 +1,5 @@
 import { cache } from 'react';
+import { connection } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
 
@@ -19,8 +20,15 @@ export type CurrentUser = {
  * Wrapped in React `cache` so the layout, sidebar and page can each ask for it
  * during one render without re-running the query. Reads go through the Supabase
  * client (not Drizzle) so Row Level Security applies.
+ *
+ * `connection()` is not optional here. The auth client reads the clock, and
+ * Partial Prefetching prerenders each segment on its own — without a
+ * request-time boundary Next aborts the whole route with "unstable value
+ * Date.now() while prerendering".
  */
 export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
+  await connection();
+
   const supabase = await createClient();
   const {
     data: { user },
