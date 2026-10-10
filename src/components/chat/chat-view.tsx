@@ -78,10 +78,30 @@ const router = useRouter();
   const [webSearch, setWebSearch] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Drag-and-drop target state. The counter is what makes the highlight stable:
+  // dragenter/dragleave fire for every child element the pointer crosses, so a
+  // boolean would flicker the overlay off the moment it moved over the textarea.
+  const [dropping, setDropping] = useState(false);
+  const dragDepth = useRef(0);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [turns]);
+
+  // Dragging out of the browser window fires no dragleave on this element, which
+  // would strand the drop overlay. dragend always fires, wherever it lands.
+  useEffect(() => {
+    const clear = () => {
+      dragDepth.current = 0;
+      setDropping(false);
+    };
+    window.addEventListener('dragend', clear);
+    window.addEventListener('drop', clear);
+    return () => {
+      window.removeEventListener('dragend', clear);
+      window.removeEventListener('drop', clear);
+    };
+  }, []);
 
 const appendTo = useCallback((id: string, part: Part) => {
     setTurns((prev) =>
@@ -177,22 +197,30 @@ if (event.type === 'reasoning-delta')
     [appendTo, modelId, router],
   );
 
+  /**
+   * A conversation is what attachments hang off, and a brand-new chat has none.
+   * `send` creates one on demand; uploads need the same, otherwise attaching a
+   * file is impossible until after the first message.
+   */
+  const ensureConversation = useCallback(async (): Promise<string | null> => {
+    if (conversationId) return conversationId;
+
+    const res = await fetch('/api/conversations', { method: 'POST' });
+    if (!res.ok) {
+      setStatus({ kind: 'error', message: 'สร้างสนทนาไม่สำเร็จ' });
+      return null;
+    }
+    const id = (await res.json()).id as string;
+    router.replace(`/chat/${id}`);
+    return id;
+  }, [conversationId, router]);
+
   const send = useCallback(async () => {
     const text = input.trim();
     if ((!text && files.length === 0) || status.kind === 'streaming' || !modelId) return;
 
-    // Uploads need a conversation to hang off, and a brand-new chat has none
-    // until its first turn is created.
-    let target = conversationId;
-    if (!target) {
-      const res = await fetch('/api/conversations', { method: 'POST' });
-      if (!res.ok) {
-        setStatus({ kind: 'error', message: 'สร้างสนทนาไม่สำเร็จ' });
-        return;
-      }
-      target = (await res.json()).id as string;
-      router.replace(`/chat/${target}`);
-    }
+    const target = await ensureConversation();
+    if (!target) return;
 
     const userTurn: Turn = { id: nextId(), role: 'user', parts: [{ type: 'text', text }] };
     const botId = nextId();
@@ -202,7 +230,7 @@ if (event.type === 'reasoning-delta')
     setInput('');
     setFiles([]);
     await stream(history, botId, target, webSearch);
-  }, [conversationId, files.length, input, modelId, nextId, router, status.kind, stream, turns, webSearch]);
+  }, [ensureConversation, files.length, input, modelId, nextId, status.kind, stream, turns, webSearch]);
 
   /** Forks a turn server-side, then regenerates from that point. */
   async function forkFrom(turnId: string, replacement?: string) {
@@ -248,12 +276,16 @@ if (event.type === 'reasoning-delta')
   }
 
   async function uploadFiles(list: FileList | null) {
-    if (!list?.length || !conversationId) return;
+    if (!list?.length) return;
+
+    const target = await ensureConversation();
+    if (!target) return;
+
     setUploading(true);
     try {
       for (const file of Array.from(list)) {
         const form = new FormData();
-        form.append('conversationId', conversationId);
+        form.append('conversationId', target);
         form.append('file', file);
 
         const res = await fetch('/api/attachments', { method: 'POST', body: form });
@@ -271,8 +303,54 @@ if (event.type === 'reasoning-delta')
 
   const busy = status.kind === 'streaming';
 
+  /** Only react to drags that actually carry files, not selected text. */
+  const carriesFiles = (e: React.DragEvent) =>
+    e.dataTransfer.types.includes('Files');
+
+  function onDragEnter(e: React.DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current += 1;
+    setDropping(true);
+  }
+
+  function onDragOver(e: React.DragEvent) {
+    if (!carriesFiles(e)) return;
+    // Without this the browser refuses the drop and navigates to the file.
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+
+  function onDragLeave(e: React.DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setDropping(false);
+  }
+
+  function onDrop(e: React.DragEvent) {
+    if (!carriesFiles(e)) return;
+    e.preventDefault();
+    dragDepth.current = 0;
+    setDropping(false);
+    void uploadFiles(e.dataTransfer.files);
+  }
+
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div
+      className="relative flex min-h-0 flex-1 flex-col"
+      onDragEnter={onDragEnter}
+      onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
+      onDrop={onDrop}
+    >
+      {dropping && (
+        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-xl border-2 border-dashed border-primary bg-primary/5">
+          <p className="bg-primary text-primary-foreground rounded-full px-4 py-2 text-sm font-medium shadow-lg">
+            วางไฟล์เพื่อแนบ
+          </p>
+        </div>
+      )}
       {conversationId && (
         <header className="flex h-12 shrink-0 items-center gap-2 border-b px-4">
           <span className="truncate text-sm font-medium">สนทนา</span>
@@ -295,8 +373,7 @@ if (event.type === 'reasoning-delta')
               <p className="text-muted-foreground mt-2 text-sm">
                 คุณมี <span className="font-medium tabular-nums">{credits}</span> เครดิต ·
                 เลือกได้ <span className="font-medium tabular-nums">{models.length}</span>{' '}
-                โมเดลจาก{' '}
-                {[...new Set(models.map((m) => m.provider))].join(' และ ')}
+                โมเดล
               </p>
             </div>
           ) : (
@@ -411,8 +488,8 @@ if (event.type === 'reasoning-delta')
                 variant="ghost"
                 className="size-8"
                 aria-label="แนบไฟล์"
-                disabled={busy || uploading || !conversationId}
-                title={conversationId ? 'แนบไฟล์' : 'เริ่มแชทก่อนจะแนบไฟล์ได้'}
+                disabled={busy || uploading}
+                title="แนบไฟล์"
                 onClick={() => fileRef.current?.click()}
               >
                 {uploading ? (
