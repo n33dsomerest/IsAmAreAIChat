@@ -115,7 +115,7 @@ try {
           parts: [
             {
               type: 'text',
-              text: 'สร้างหน้าเว็บ HTML ง่ายๆ ให้หนึ่งหน้า ใช้ create_artifact ภาษา html',
+              text: 'สร้างหน้าเว็บ HTML ง่ายๆ ให้หนึ่งหน้า ใส่ในบล็อก ```artifact lang=html',
             },
           ],
         },
@@ -124,9 +124,7 @@ try {
     }),
   });
 
-  let artifactEvents = [];
   let text = '';
-  let reasoning = 0;
   if (chat.body) {
     const reader = chat.body.getReader();
     const decoder = new TextDecoder();
@@ -137,27 +135,16 @@ try {
         if (!line.startsWith('data: ')) continue;
         const e = JSON.parse(line.slice(6));
         if (e.type === 'text-delta') text += e.text;
-        if (e.type === 'reasoning-delta') reasoning += (e.text ?? '').length;
-        if (e.type === 'artifact') artifactEvents.push(e.artifact);
       }
     }
   }
 
   check('the chat streams', chat.status === 200, `status=${chat.status}`);
+  check('the model wrote something', text.trim().length > 0, `${text.length} chars`);
   check(
-    'an artifact was produced',
-    artifactEvents.length > 0,
-    `${artifactEvents.length} artifacts, text=${text.length} reasoning=${reasoning}`,
-  );
-  check(
-    'the artifact carries a language',
-    artifactEvents[0]?.language === 'html',
-    artifactEvents[0]?.language ?? '',
-  );
-  check(
-    'the artifact carries source',
-    (artifactEvents[0]?.source?.length ?? 0) > 20,
-    `${artifactEvents[0]?.source?.length ?? 0} bytes`,
+    'the reply contains an artifact fence',
+    /```artifact\s+lang=html/.test(text),
+    text.match(/```artifact[^\n]*/)?.[0] ?? 'no fence in the reply',
   );
 
   /* It is stored, and listable ------------------------------------------- */
@@ -168,11 +155,8 @@ try {
       join public.messages m on m.id = a.message_id
      where m.conversation_id = ${conversationId}`;
   check('it is stored as its own row', stored.length > 0, `${stored.length} rows`);
-  check(
-    'the stored language matches',
-    stored[0]?.language === artifactEvents[0]?.language,
-    `${stored[0]?.language}`,
-  );
+  check('the artifact language was read', stored[0]?.language === 'html', stored[0]?.language ?? '');
+  check('the source was captured', (stored[0]?.source?.length ?? 0) > 20, `${stored[0]?.source?.length ?? 0} bytes`);
 
   const parts = await sql`
     select parts from public.messages

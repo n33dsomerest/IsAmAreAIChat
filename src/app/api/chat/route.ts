@@ -7,7 +7,8 @@ import { requireUser } from '@/lib/api/auth';
 import { buildFallbackChain } from '@/lib/ai/resolve';
 import { generateWithFallback } from '@/lib/ai/generate';
 import { buildToolSet } from '@/lib/ai/tool-registry';
-import { artifactTools, extractArtifacts, type Artifact } from '@/lib/chat/artifacts';
+import { sweepIfDue } from '@/lib/credits/sweep-usage';
+import { ARTIFACT_INSTRUCTIONS, extractArtifacts, type Artifact } from '@/lib/chat/artifacts';
 import {
   DEFAULT_SYSTEM_PROMPT,
   MAX_INLINE_BYTES,
@@ -21,7 +22,15 @@ import { db } from '@/lib/db';
 import { artifacts, attachments, conversations, messages, usageEvents } from '@/lib/db/schema';
 import { download, toBase64 } from '@/lib/storage';
 
-export const maxDuration = 60;
+/**
+ * Vercel Hobby allows 300s; the previous 60 was our own declaration rather than
+ * a platform limit, and it was cutting off turns that used tools — those run
+ * 2+ minutes because every tool call is a round trip back through the model.
+ */
+export const maxDuration = 300;
+
+/** How often to poke an idle stream. Matches the usual SSE keep-alive interval. */
+const HEARTBEAT_MS = 10_000;
 
 /**
  * The quota day. Must stay `to_char(created_at AT TIME ZONE 'utc')` to match the
@@ -115,6 +124,11 @@ export async function POST(request: Request) {
   }
 
   /* ── 2. charge first: no token is produced without a debit ─────────────── */
+  // Turns killed at the platform's duration limit never reach their own
+  // settle(), so their credits would be held forever. Reclaim any that have
+  // aged out before adding to the pile.
+  void sweepIfDue();
+
   const charged = await db.execute(sql`
     select * from public.consume_credit(
       ${user.id}::uuid,
@@ -380,25 +394,25 @@ export async function POST(request: Request) {
       }
     }
 
-    // Artifacts created by the tool land here and are streamed as their own
-    // parts so the renderer can put them beside the prose.
-    const produced: Artifact[] = [];
-    let emitted = 0;
-    if (wantArtifacts) Object.assign(tools, artifactTools((a) => produced.push(a)));
-
+    // Artifacts arrive as fenced blocks inside the text rather than as tool
+    // calls, so there is nothing to buffer while streaming; they are split out
+    // at `finish`.
     const failures: string[] = [];
     const result_ = await generateWithFallback({
       chain,
-      // The refs have to reach the model as well as the database. `toModelMessages`
-      // is what turns a ref plus its bytes into a real file part, and it reads
-      // them off the history it is handed — sending the raw request messages
-      // meant the attachment was stored, linked, and then silently never sent.
+      // The refs have to reach the model as well as the database.
+      // `toModelMessages` is what turns a ref plus its bytes into a real file
+      // part, and it reads them off the history it is handed — sending the raw
+      // request messages meant the attachment was stored, linked, and then
+      // silently never sent.
       messages: uiMessages.length
         ? (uiMessages.map((m, i) =>
             i === uiMessages.length - 1 ? { ...m, parts: storedParts } : m,
           ) as UIMessage[])
         : uiMessages,
-      systemPrompt: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
+      systemPrompt: wantArtifacts
+        ? `${systemPrompt ?? DEFAULT_SYSTEM_PROMPT}\n\n${ARTIFACT_INSTRUCTIONS}`
+        : (systemPrompt ?? DEFAULT_SYSTEM_PROMPT),
       temperature,
       maxOutputTokens,
       tools,
@@ -427,15 +441,53 @@ export async function POST(request: Request) {
     const sse = (payload: unknown) =>
       encoder.encode(`data: ${JSON.stringify(payload)}\n\n`);
 
+    /**
+     * A comment line, which SSE defines as keep-alive and every client ignores.
+     *
+     * Turns that use tools can go quiet for a minute or more between chunks —
+     * a tool runs, then the model reads the result and starts thinking again.
+     * Vercel sends HTTP/2 PING frames to keep such connections open, but
+     * HTTP/1.1 has no equivalent, and proxies along the way can close a silent
+     * connection. That shows up as an answer that stops mid-sentence with no
+     * error anywhere.
+     */
+    const heartbeat = () => encoder.encode(': ping\n\n');
+
+    let lastWrite = Date.now();
+    let streamController: TransformStreamDefaultController | null = null;
+    let heartbeatTimer: ReturnType<typeof setInterval> | null = null;
+    const stopHeartbeat = () => {
+      if (heartbeatTimer) clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    };
+
+    heartbeatTimer = setInterval(() => {
+      // Only while genuinely idle: a stream that is producing output has no
+      // need for one, and writes are what we are protecting.
+      if (!streamController || Date.now() - lastWrite < HEARTBEAT_MS) return;
+      try {
+        streamController.enqueue(heartbeat());
+        lastWrite = Date.now();
+      } catch {
+        // The client is gone; the abort path will settle the turn.
+        stopHeartbeat();
+      }
+    }, HEARTBEAT_MS);
+    heartbeatTimer.unref?.();
+
     // Accumulated so the assistant turn can be persisted once, at the end.
     let answer = '';
     const parts: unknown[] = [];
 
     const stream = result_.stream.pipeThrough(
       new TransformStream({
+        start(controller) {
+          streamController = controller;
+        },
         // Async on purpose: the `finish` event must not reach the client before
         // the turn is durable, or a refresh straight afterwards loses it.
         async transform(chunk, controller) {
+          lastWrite = Date.now();
           const type = chunk.type;
 
           if (type === 'text-start' || type === 'text-delta' || type === 'text-end') {
@@ -457,12 +509,6 @@ export async function POST(request: Request) {
           // Tool lifecycle: the UI shows what the assistant is doing.
           if (type === 'tool-result') {
             controller.enqueue(sse({ ...(chunk as object) }));
-            // Emit only what has not been sent yet — the array is still needed
-            // at `finish`, where every artifact gets persisted.
-            for (const artifact of produced.slice(emitted)) {
-              controller.enqueue(sse({ type: 'artifact', artifact }));
-            }
-            emitted = produced.length;
             return;
           }
           if (type.startsWith('tool-')) {
@@ -478,20 +524,14 @@ export async function POST(request: Request) {
               latencyMs: Date.now() - startedAt,
             });
 
-            // Inline ```artifact fences are pulled out here rather than in the
-            // browser, so what gets stored is already split.
+            // ```artifact fences are pulled out here rather than in the browser, so
+            // what gets stored is already split.
             const segments = extractArtifacts(answer).segments;
-            const partsWithText = [
-              ...segments.map((s) =>
-                s.type === 'text'
-                  ? { type: 'text', text: s.text }
-                  : { type: 'artifact', artifact: s.artifact },
-              ),
-            ];
-
-            for (const artifact of produced) {
-              partsWithText.push({ type: 'artifact', artifact });
-            }
+            const partsWithText = segments.map((s) =>
+              s.type === 'text'
+                ? { type: 'text', text: s.text }
+                : { type: 'artifact', artifact: s.artifact },
+            );
 
             await persistAssistant(
               partsWithText,
@@ -519,6 +559,9 @@ export async function POST(request: Request) {
             void settle(String((chunk as { error?: unknown }).error ?? 'stream error'));
             controller.enqueue(sse({ type: 'error' }));
           }
+        },
+        flush() {
+          stopHeartbeat();
         },
       }),
     );

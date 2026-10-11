@@ -1,7 +1,3 @@
-import type { ToolSet } from 'ai';
-import { tool } from 'ai';
-import { z } from 'zod';
-
 /**
  * Artifacts are code blocks the model writes out deliberately, rather than
  * anything that merely looks like code in a reply. The fence carries a marker
@@ -62,34 +58,30 @@ export function extractArtifacts(text: string): {
 }
 
 /**
- * Gives the model a way to produce an artifact on purpose.
+ * Tells the model how to produce one.
  *
- * `create: false` because the source is in the tool call, not in the text —
- * the model passes the code directly and the renderer receives it as a part.
+ * This used to be a tool. A tool costs a full round trip: the model stops,
+ * emits a call, the server runs it, sends the result back, and the model picks
+ * up where it left off. Two artifacts meant two of those, and a turn that used
+ * one ran past two minutes — long enough to be cut off mid-sentence by the
+ * function timeout. Writing a fenced block costs nothing: the text is already
+ * streaming, and the fence is pulled out of it afterwards.
+ *
+ * The cost of losing the tool is that the model now chooses the fence rather
+ * than deciding to open a panel, so there is no "render this separately" step
+ * beyond the fence itself. That is the whole mechanism, and it is one regex.
  */
-export function artifactTools(onCreate: (artifact: Artifact) => void): ToolSet {
-  return {
-    create_artifact: tool({
-      description:
-        'สร้างชิ้นงานที่แสดงผลแยกจากข้อความ เช่น หน้าเว็บ HTML, กราฟ SVG, โค้ด หรือเอกสาร Markdown ' +
-        'ใช้เมื่อผลลัพธ์ยาวหรือควรเรนเดอร์เป็นโค้ด ไม่ใช่เมื่อตอบเป็นข้อความสั้น ๆ',
-      inputSchema: z.object({
-        title: z.string().max(120).optional(),
-        language: z
-          .string()
-          .regex(/^[\w+-]{1,20}$/)
-          .default('html')
-          .describe('ชนิดเนื้อหา เช่น html, svg, react, python, markdown'),
-        source: z.string().min(1).max(120_000).describe('โค้ดหรือเนื้อหาเต็ม'),
-      }),
-      execute: async ({ title, language, source }) => {
-        const artifact: Artifact = { id: nextId(), title: title ?? null, language, source };
-        onCreate(artifact);
-        return { ok: true, id: artifact.id, bytes: source.length };
-      },
-    }),
-  };
-}
+export const ARTIFACT_INSTRUCTIONS = `You can produce a standalone artifact — a rendered HTML page, an SVG chart, a diagram in mermaid, or a document — by writing it inside a fence marked with the word "artifact":
+
+\`\`\`artifact lang=html title="optional title"
+<!doctype html>…
+\`\`\`
+
+Rules:
+- \`lang\` is one of html, svg, mermaid, markdown, md. \`title\` is optional, in double quotes.
+- Put the complete artifact inside the fence — nothing may be left outside it.
+- Use this only for content that should be rendered rather than read as prose. Ordinary answers and short code samples stay as plain text in normal code fences.
+- Everything before and after the fence is shown to the user as ordinary prose.`;
 
 /** Safe to render types. Anything else is shown as source, never executed. */
 export const RENDERABLE = new Set(['html', 'svg', 'mermaid', 'markdown', 'md']);

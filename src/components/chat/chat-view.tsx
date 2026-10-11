@@ -349,6 +349,10 @@ if (event.type === 'reasoning-delta')
   }
 
   const busy = status.kind === 'streaming';
+  // The server sends the model that actually answered, which is not always the
+  // one picked: the chain falls through when a model is unusable. Until that
+  // header lands there is nothing to name, so the generic line shows.
+  const statusModel = status.kind === 'streaming' ? status.model : '';
 
   /**
    * What the currently selected model will not be able to read, if anything.
@@ -445,7 +449,11 @@ if (event.type === 'reasoning-delta')
             <ol className="space-y-6">
               {turns.map((turn, i) => (
                 <li key={turn.id} className="group/turn relative">
-                  <TurnView turn={turn} streaming={turn.role === 'assistant' && busy} />
+                  <TurnView
+                    turn={turn}
+                    streaming={turn.role === 'assistant' && busy}
+                    model={turn.role === 'assistant' && busy ? statusModel : undefined}
+                  />
                   {!busy && conversationId && (
                     <div className="absolute -top-3 right-0 flex gap-0.5 opacity-0 transition-opacity group-hover/turn:opacity-100">
                       {turn.role === 'assistant' ? (
@@ -634,7 +642,15 @@ if (event.type === 'reasoning-delta')
   );
 }
 
-function TurnView({ turn, streaming }: { turn: Turn; streaming: boolean }) {
+function TurnView({
+  turn,
+  streaming,
+  model,
+}: {
+  turn: Turn;
+  streaming: boolean;
+  model?: string;
+}) {
   if (turn.role === 'user') {
     const files = turn.parts.filter((p): p is AttachmentRef => p.type === 'file');
     return (
@@ -685,7 +701,10 @@ function TurnView({ turn, streaming }: { turn: Turn; streaming: boolean }) {
       ))}
 
       {streaming && !prose && !artifacts.length && (
-        <Loader2 className="text-muted-foreground inline size-4 animate-spin" />
+        <p className="text-muted-foreground flex items-center gap-2 text-sm">
+          <Loader2 className="size-4 animate-spin" />
+          {model ? `กำลังคิดด้วย ${model}…` : 'กำลังคิด…'}
+        </p>
       )}
     </div>
   );

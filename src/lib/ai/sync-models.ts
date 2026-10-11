@@ -97,6 +97,20 @@ function derivePricing(raw: RawModel): ModelPricing {
   };
 }
 
+/**
+ * A presentable name for a model id, used only when the gateway does not supply
+ * one. `vendor/model-3-super:free` becomes `Model 3 Super`.
+ */
+function humanize(id: string): string {
+  const slug = id.split('/').pop() ?? id;
+  return (
+    slug
+      .replace(/:free$/i, '')
+      .replace(/[-_]+/g, ' ')
+      .trim() || id
+  );
+}
+
 export function normalizeModel(raw: RawModel, providerSlug?: string): RemoteModel | null {
   const id = str(raw.id);
   if (!id) return null;
@@ -107,7 +121,12 @@ export function normalizeModel(raw: RawModel, providerSlug?: string): RemoteMode
 
   return {
     remoteModelId: id,
-    displayName: curatedLabel(id, str(raw.name) ?? id),
+    // Passing the id as the fallback name looks harmless and is not: it is how
+    // a curated model loses its curated name the moment the upstream catalogue
+    // omits `name` for it, which it already does for the router. The label then
+    // reads `nvidia/nemotron-3-super-120b-a12b:free` in the picker instead of
+    // the name someone chose, with nothing in the diff to explain it.
+    displayName: curatedLabel(id, str(raw.name) ?? humanize(id)),
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
     // `max_tokens` is OpenRouter's per-model ceiling; some gateways only report
     // it per upstream provider, hence the second source.

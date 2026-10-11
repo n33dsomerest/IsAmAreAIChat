@@ -82,6 +82,15 @@ function defaultEnabled(providerName, remoteModelId) {
   return isFree(remoteModelId);
 }
 
+/**
+ * A presentable name for a model id, used only when the gateway supplies none.
+ * Kept in step with humanize() in src/lib/ai/sync-models.ts.
+ */
+function humanize(id) {
+  const slug = String(id).split('/').pop() ?? id;
+  return slug.replace(/:free$/i, '').replace(/[-_]+/g, ' ').trim() || id;
+}
+
 function normalize(raw, providerName) {
   const id = typeof raw.id === 'string' ? raw.id : null;
   if (!id) return null;
@@ -99,7 +108,7 @@ function normalize(raw, providerName) {
 
   return {
     remoteModelId: id,
-    displayName: curatedLabel(id, typeof raw.name === 'string' && raw.name ? raw.name : id),
+    displayName: curatedLabel(id, typeof raw.name === 'string' && raw.name ? raw.name : humanize(id)),
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
     maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
     capabilities: {
