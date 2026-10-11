@@ -317,26 +317,31 @@ if (event.type === 'reasoning-delta')
     router.refresh();
   }
 
-  async function uploadFiles(list: FileList | null) {
-    if (!list?.length) return;
+  async function uploadFiles(list: readonly File[]) {
+    if (!list.length) return;
 
     const target = await ensureConversation();
     if (!target) return;
 
     setUploading(true);
     try {
-      for (const file of Array.from(list)) {
+      for (const file of list) {
         const form = new FormData();
         form.append('conversationId', target);
         form.append('file', file);
 
-        const res = await fetch('/api/attachments', { method: 'POST', body: form });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          toast.error(data.error ?? `อัปโหลด ${file.name} ไม่สำเร็จ`);
-          continue;
+        try {
+          const res = await fetch('/api/attachments', { method: 'POST', body: form });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            toast.error(data.error ?? `อัปโหลด ${file.name} ไม่สำเร็จ`);
+            continue;
+          }
+          setFiles((prev) => [...prev, data as PendingFile]);
+        } catch {
+          // A dead network must not look like a button that does nothing.
+          toast.error(`ส่งไฟล์ ${file.name} ไม่สำเร็จ — เชื่อมต่ออินเทอร์เน็ตไม่ได้`);
         }
-        setFiles((prev) => [...prev, data as PendingFile]);
       }
     } finally {
       setUploading(false);
@@ -393,7 +398,7 @@ if (event.type === 'reasoning-delta')
     e.preventDefault();
     dragDepth.current = 0;
     setDropping(false);
-    void uploadFiles(e.dataTransfer.files);
+    void uploadFiles(Array.from(e.dataTransfer.files));
   }
 
   return (
@@ -554,8 +559,15 @@ if (event.type === 'reasoning-delta')
                 accept="image/*,application/pdf,text/plain,text/markdown,text/csv,application/json"
                 className="hidden"
                 onChange={(e) => {
-                  void uploadFiles(e.target.files);
+                  // Snapshot before resetting the input. `FileList` is live, not
+                  // a copy: clearing `value` empties the very list the upload is
+                  // about to read, so by the time the async work resumed it saw
+                  // zero files and did nothing at all — no request, no chip, no
+                  // error, and with no toast mounted there was nothing on screen
+                  // to say the button had been pressed.
+                  const picked = Array.from(e.target.files ?? []);
                   e.target.value = '';
+                  void uploadFiles(picked);
                 }}
               />
               <Button

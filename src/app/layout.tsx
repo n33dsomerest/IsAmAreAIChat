@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Noto_Sans_Thai } from 'next/font/google';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Toaster } from '@/components/ui/sonner';
 
 import { ServiceWorkerRegistrar } from '@/components/service-worker-registrar';
 import { ThemeProvider } from '@/components/theme-provider';
@@ -72,6 +73,11 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
         >
 <I18nProvider>
             <ServiceWorkerRegistrar />
+            {/* Nothing renders a toast without this. Every failure path in the app
+                calls toast.error and then gives up; without the Toaster mounted
+                here they all failed silently — an upload that errored just looked
+                like a button that did nothing. */}
+            <Toaster />
             <TooltipProvider>{children}</TooltipProvider>
           </I18nProvider>
         </ThemeProvider>
