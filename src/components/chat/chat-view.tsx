@@ -25,6 +25,7 @@ import { ArtifactCard } from '@/components/chat/artifact-card';
 import { CONVERSATIONS_KEY } from '@/components/chat/conversation-list';
 import { AttachmentList } from '@/components/chat/attachment-list';
 import { ModelPicker, type PickerModel } from '@/components/chat/model-picker';
+import { Markdown } from '@/components/markdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -692,9 +693,7 @@ function TurnView({
         </details>
       )}
 
-      {prose.trim() && (
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">{prose}</div>
-      )}
+      {prose.trim() && <Markdown>{prose}</Markdown>}
 
       {artifacts.map((p) => (
         <ArtifactCard key={p.artifact.id} artifact={p.artifact} />
