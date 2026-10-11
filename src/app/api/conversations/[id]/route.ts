@@ -97,9 +97,20 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     cursor = cursor.parentId ? byId.get(cursor.parentId) : undefined;
   }
 
+  /**
+   * A broken chain hides history instead of failing, which is the worst kind of
+   * bug — the rows are still in the table, the reader just never walks to them.
+   * A root sitting outside the path means some turn was stored without a parent,
+   * so fall back to the flat chronological order: complete and in order, minus
+   * the pruning a healthy chain would have given us.
+   */
+  const onPath = new Set(path.map((m) => m.id));
+  const orphanedRoots = all.filter((m) => !m.parentId && !onPath.has(m.id));
+  const visible = orphanedRoots.length ? all : path;
+
   return NextResponse.json({
     conversation,
-    messages: path.map((m) => ({
+    messages: visible.map((m) => ({
       id: m.id,
       role: m.role,
       parts: m.parts,
@@ -109,7 +120,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       /** More than one successor means this turn was forked. */
       branchCount: children.get(m.id)?.length ?? 0,
     })),
-    branchPoints: all.length - path.length,
+    branchPoints: all.length - visible.length,
   });
 }
 

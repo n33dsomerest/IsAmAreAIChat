@@ -68,12 +68,19 @@ export default async function ChatPage({ params }: PageProps<'/chat/[id]'>) {
     path.unshift(cursor);
   }
 
+  // Mirrors the API route: a root outside the path means the chain is broken, and
+  // reading the table in order is both complete and correctly sorted — just
+  // unpruned.
+  const onPath = new Set(path.map((m) => m.id));
+  const orphanedRoots = rows.filter((m) => !m.parentId && !onPath.has(m.id));
+  const visible: typeof rows = orphanedRoots.length ? rows : path;
+
   return (
     <ChatView
       conversationId={conversation.id}
       credits={user.credits}
       initialModelId={conversation.modelId}
-      initialTurns={path.map((m) => ({
+      initialTurns={visible.map((m) => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',
         parts: Array.isArray(m.parts) ? (m.parts as never) : [],

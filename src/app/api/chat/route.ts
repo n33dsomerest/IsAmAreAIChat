@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import type { UIMessage } from 'ai';
 
@@ -309,10 +309,23 @@ export async function POST(request: Request) {
       ),
     ];
 
+    // Every turn hangs off the one before it, because that chain is the only
+    // thing the history reader walks. Writing the user turn without a parent
+    // left it as its own root, and a reader starting from the newest leaf could
+    // never reach past the previous exchange — older turns were still in the
+    // table, just invisible.
+    const [tip] = await db
+      .select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.conversationId, conversationIdResolved))
+      .orderBy(desc(messages.createdAt), desc(messages.id))
+      .limit(1);
+
     const storedUser = await db
       .insert(messages)
       .values({
         conversationId: conversationIdResolved,
+        parentId: tip?.id ?? null,
         role: 'user',
         parts: storedParts,
         status: 'complete',
