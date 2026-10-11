@@ -21,6 +21,38 @@ export const CURATED_OPENROUTER: ReadonlyArray<{ id: string; label: string }> = 
 
 const CURATED_BY_ID = new Map(CURATED_OPENROUTER.map((m) => [m.id, m.label]));
 
+/**
+ * The OKMD models that actually read an image.
+ *
+ * OKMD's `/models` returns nothing but id, name, created and owner — no
+ * modality, no architecture — so there is nothing to derive vision from. This
+ * list was measured instead: every model was sent the same 1x1 red PNG and
+ * asked to name the colour. Eleven of twenty-nine answered "red"; the rest
+ * returned nothing or guessed another colour.
+ *
+ * Measured rather than documented, so re-check it if OKMD changes its
+ * catalogue.
+ */
+export const OKMD_VISION = new Set([
+  'gemini-3.8-flash',
+  'gemini-3.7-flash',
+  'gemini-3.5-flash',
+  'gemini-3.1-pro-preview',
+  'gemini-3.1-flash-lite',
+  'gemini-3.1-flash-lite-preview',
+  'gemini-2.5-flash-lite',
+  'llama-4-maverick',
+  'llama-4-scout',
+  'mistral-medium-3.1',
+  'nova-pro-v1',
+]);
+
+/** True when a model on this provider has been measured to read images. */
+export function hasKnownVision(providerSlug: string, remoteModelId: string): boolean {
+  if (providerSlug === 'okmd') return OKMD_VISION.has(remoteModelId);
+  return false;
+}
+
 /** True when this id is one of the models we deliberately offer. */
 export function isCuratedOpenRouter(id: string): boolean {
   return CURATED_BY_ID.has(id);

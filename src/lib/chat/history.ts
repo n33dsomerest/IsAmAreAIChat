@@ -25,6 +25,16 @@ export type AttachmentRef = {
   sizeBytes: number;
 };
 
+/**
+ * What actually lives in `messages.parts`.
+ *
+ * Wider than `UIMessage['parts']` on purpose: an attachment reference is not a
+ * UI part (it has no url and nothing to render), it is our own record pointing
+ * at Storage. Reading code should narrow through `attachmentRefs` rather than
+ * assume every part came from the UI.
+ */
+export type StoredPart = UIMessage['parts'][number] | AttachmentRef;
+
 /** An attachment loaded from Storage and ready to hand to a model. */
 export type InlineAttachment = {
   attachmentId: string;

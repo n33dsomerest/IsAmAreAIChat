@@ -42,8 +42,14 @@ try {
   const cookie = [...jar].map(([n, v]) => `${n}=${v}`).join('; ');
 
   const cat = await (await fetch(`${APP}/api/models`, { headers: { cookie } })).json();
-  const model = (cat.models ?? []).find((m) => m.providerId && m.capabilities?.vision);
-  check('a vision-capable model is available', Boolean(model), model?.label ?? 'none');
+  const vision = (cat.models ?? []).filter((m) => m.capabilities?.vision);
+  check('a vision-capable model is available', vision.length > 0, vision.map((m) => m.label).join(', '));
+  // Not every model that *claims* vision will pass the image through, and the
+  // two OpenRouter entries are unreliable for this: Inkling refuses the API
+  // outright (403), and Auto Router sends the request to whichever free model
+  // happens to be available, which may have no vision at all. A named OKMD
+  // model is the only choice here that actually asserts "I looked at it".
+  const model = vision.find((m) => m.provider === 'okmd') ?? vision[0];
 
   const conversationId = (
     await (await fetch(`${APP}/api/conversations`, { method: 'POST', headers: { cookie } })).json()
@@ -77,8 +83,8 @@ try {
       conversationId,
       modelId: model.id,
       attachmentIds: [uploaded.id],
-      messages: [{ role: 'user', parts: [{ type: 'text', text: 'รูปนี้เป็นสีอะไร' }] }],
-      maxOutputTokens: 64,
+      messages: [{ role: 'user', parts: [{ type: 'text', text: 'รูปนี้เป็นสีอะไร ตอบคำเดียว' }] }],
+      maxOutputTokens: 4000,
     }),
   });
   const sse = await chat.text();
@@ -100,9 +106,10 @@ try {
   const said = sse.match(/"text":"([^"]+)"/g)?.map((m) => m.slice(8, -1)).join('') ?? '';
 
   // Before blaming this code for an empty stream, find out whether *any* model
-  // is answering right now. OpenRouter's free tier returns 429 once the day's
-  // quota is spent, which looks exactly like a bug and is not one.
+  // is answering right now. Providers go down and rate-limit independently of
+  // whether our plumbing is correct, so separate the two.
   let anythingAnswers = said.trim().length > 0;
+  let probeError = '';
   if (!anythingAnswers) {
     const probe = await fetch(`${APP}/api/chat`, {
       method: 'POST',
@@ -111,18 +118,17 @@ try {
         conversationId,
         modelId: model.id,
         messages: [{ role: 'user', parts: [{ type: 'text', text: 'Say OK' }] }],
-        maxOutputTokens: 16,
+        maxOutputTokens: 3000,
       }),
     });
-    const probeText = await probe.text();
-    anythingAnswers = /"text":"[^"]+"/.test(probeText);
+    const probeBody = await probe.text();
+    anythingAnswers = /"text":"[^"]+"/.test(probeBody);
+    if (!anythingAnswers) probeError = probeBody.slice(0, 200);
   }
 
   if (!anythingAnswers) {
-    console.log('⏭  the model did not answer — every provider is refusing right now');
-    console.log('   (OpenRouter free returns 429 once the daily quota is gone;');
-    console.log('    OKMD exposes no capability metadata, so nothing here reports vision)');
-    console.log('   skipping the two "the model saw the image" checks');
+    console.log('⏭  the model did not answer — skipping the two "the model saw the image" checks');
+    console.log(`   ${model.label} returned nothing${probeError ? `: ${probeError}` : ''}`);
   } else {
     check('the model answered at all', said.trim().length > 0, said.slice(0, 90) || '(no text)');
     check(

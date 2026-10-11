@@ -389,7 +389,15 @@ export async function POST(request: Request) {
     const failures: string[] = [];
     const result_ = await generateWithFallback({
       chain,
-      messages: uiMessages,
+      // The refs have to reach the model as well as the database. `toModelMessages`
+      // is what turns a ref plus its bytes into a real file part, and it reads
+      // them off the history it is handed — sending the raw request messages
+      // meant the attachment was stored, linked, and then silently never sent.
+      messages: uiMessages.length
+        ? (uiMessages.map((m, i) =>
+            i === uiMessages.length - 1 ? { ...m, parts: storedParts } : m,
+          ) as UIMessage[])
+        : uiMessages,
       systemPrompt: systemPrompt ?? DEFAULT_SYSTEM_PROMPT,
       temperature,
       maxOutputTokens,

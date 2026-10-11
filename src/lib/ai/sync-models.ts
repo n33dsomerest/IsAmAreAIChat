@@ -1,6 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm';
 
-import { curatedLabel } from '@/lib/ai/model-curation';
+import { curatedLabel, hasKnownVision } from '@/lib/ai/model-curation';
 import { db } from '@/lib/db';
 import { providers, providerModels } from '@/lib/db/schema';
 import type { ModelCapabilities, ModelPricing } from '@/lib/db/schema';
@@ -97,9 +97,13 @@ function derivePricing(raw: RawModel): ModelPricing {
   };
 }
 
-export function normalizeModel(raw: RawModel): RemoteModel | null {
+export function normalizeModel(raw: RawModel, providerSlug?: string): RemoteModel | null {
   const id = str(raw.id);
   if (!id) return null;
+
+  // Some gateways publish no modality information at all, so what the catalogue
+  // claims has to be corrected by measurement for the ones we have measured.
+  const measuredVision = providerSlug ? hasKnownVision(providerSlug, id) : false;
 
   return {
     remoteModelId: id,
@@ -108,7 +112,9 @@ export function normalizeModel(raw: RawModel): RemoteModel | null {
     // `max_tokens` is OpenRouter's per-model ceiling; some gateways only report
     // it per upstream provider, hence the second source.
     maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
-    capabilities: deriveCapabilities(raw),
+    capabilities: measuredVision
+      ? { ...deriveCapabilities(raw), vision: true }
+      : deriveCapabilities(raw),
     pricing: derivePricing(raw),
   };
 }
@@ -153,7 +159,7 @@ export async function fetchRemoteModels(
           : [];
 
     return list
-      .map((m) => normalizeModel(m as RawModel))
+      .map((m) => normalizeModel(m as RawModel, provider.name.toLowerCase()))
       .filter((m): m is RemoteModel => m !== null);
   } finally {
     clearTimeout(timer);

@@ -64,7 +64,7 @@ function modeFor(provider) {
 }
 
 /** Minimal port of src/lib/ai/sync-models.ts — this script runs outside Next. */
-import { curatedLabel, isCuratedOpenRouter } from '../src/lib/ai/model-curation.ts';
+import { curatedLabel, hasKnownVision, isCuratedOpenRouter } from '../src/lib/ai/model-curation.ts';
 
 function num(v) {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
@@ -82,7 +82,7 @@ function defaultEnabled(providerName, remoteModelId) {
   return isFree(remoteModelId);
 }
 
-function normalize(raw) {
+function normalize(raw, providerName) {
   const id = typeof raw.id === 'string' ? raw.id : null;
   if (!id) return null;
 
@@ -95,6 +95,7 @@ function normalize(raw) {
     const n = num(v);
     return n === null ? undefined : Math.round(n * 1_000_000 * 1e6) / 1e6;
   };
+  const measuredVision = hasKnownVision(providerName, id);
 
   return {
     remoteModelId: id,
@@ -102,7 +103,7 @@ function normalize(raw) {
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
     maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
     capabilities: {
-      vision: modalities.includes('image'),
+      vision: modalities.includes('image') || measuredVision,
       tools: params.includes('tools') || params.includes('tool_choice'),
       reasoning: params.includes('reasoning') || params.includes('include_reasoning'),
       json: params.includes('response_format') || params.includes('structured_outputs'),
@@ -161,7 +162,7 @@ async function sync(providerId, provider) {
     }
     const json = await res.json();
     const list = Array.isArray(json) ? json : (json?.data ?? json?.models ?? []);
-    remote = list.map(normalize).filter(Boolean);
+    remote = list.map((m) => normalize(m, provider.name.toLowerCase())).filter(Boolean);
   } catch (err) {
     console.log(`  ✗ ${label}: ${err.name === 'AbortError' ? 'timed out' : err.message}`);
     return;

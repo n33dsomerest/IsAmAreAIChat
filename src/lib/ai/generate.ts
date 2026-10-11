@@ -107,7 +107,13 @@ export async function generateWithFallback({
       const reader = result.fullStream.getReader();
       const first = await reader.read();
       if (first.done) {
-        throw new NonRetryableError('The model returned an empty response.');
+        // Retryable on purpose. This model produced nothing, but that says
+        // nothing about the next one in the chain: `openrouter/free` routes to
+        // whichever free model is free at that moment, and a reasoning-heavy one
+        // can spend the whole token budget thinking and never emit a token.
+        // Treating it as fatal meant one unlucky router ended the request even
+        // though a perfectly good model was sitting further down the list.
+        throw new Error('The model returned an empty response.');
       }
 
       // The first chunk has been taken off the SDK's stream, so the caller gets
