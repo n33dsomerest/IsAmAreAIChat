@@ -76,6 +76,11 @@ try {
   check('message_id is still null before sending', linked.message_id === null);
 
   /* ── send ───────────────────────────────────────────────────────────────── */
+  // The payload mirrors what the browser actually posts: the client keeps a
+  // `file` part on its optimistic turn *and* sends `attachmentIds`. Sending only
+  // the ids hid the bug where the server appended a second ref to the ones the
+  // client had already sent, so the same image was stored — and sent to the
+  // model — twice, and only showed up as a duplicate thumbnail after a reload.
   const chat = await fetch(`${APP}/api/chat`, {
     method: 'POST',
     headers: { cookie, 'content-type': 'application/json' },
@@ -83,7 +88,22 @@ try {
       conversationId,
       modelId: model.id,
       attachmentIds: [uploaded.id],
-      messages: [{ role: 'user', parts: [{ type: 'text', text: 'รูปนี้เป็นสีอะไร ตอบคำเดียว' }] }],
+      messages: [
+        {
+          role: 'user',
+          parts: [
+            { type: 'text', text: 'รูปนี้เป็นสีอะไร ตอบคำเดียว' },
+            {
+              type: 'file',
+              attachmentId: uploaded.id,
+              name: uploaded.name ?? 'image.png',
+              kind: uploaded.kind,
+              mime: uploaded.mime,
+              sizeBytes: uploaded.sizeBytes,
+            },
+          ],
+        },
+      ],
       maxOutputTokens: 4000,
     }),
   });
@@ -99,8 +119,10 @@ try {
   const parts = (
     await sql`select parts from public.messages where id = ${after.message_id}`
   )[0].parts;
-  const ref = (Array.isArray(parts) ? parts : []).find((p) => p?.type === 'file');
+  const fileParts = (Array.isArray(parts) ? parts : []).filter((p) => p?.type === 'file');
+  const ref = fileParts[0];
   check('the message stores the attachment for history', Boolean(ref), ref ? `${ref.name} (${ref.kind})` : 'no file part');
+  check('the attachment is stored exactly once', fileParts.length === 1, `${fileParts.length} copies`);
   check('the stored reference carries no bytes', !JSON.stringify(parts).includes('iVBOR'), 'metadata only');
 
   const said = sse.match(/"text":"([^"]+)"/g)?.map((m) => m.slice(8, -1)).join('') ?? '';

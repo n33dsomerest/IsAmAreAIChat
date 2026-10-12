@@ -295,8 +295,18 @@ export async function POST(request: Request) {
 
     // Metadata goes on the message so history can re-render the attachment; the
     // bytes stay in Storage and are only fetched if a model can use them.
+    //
+    // The client already sends a `file` ref for its own optimistic render, so
+    // appending the row-derived ref wrote the same attachment to the message
+    // twice. Nothing looked wrong until a reload, when history drew both — and
+    // `toModelMessages` reads this array, so the model was handed the image
+    // twice too. The row is authoritative, so it replaces whatever the client
+    // sent rather than sitting alongside it.
+    const clientParts = (userMessage?.parts ?? []).filter(
+      (p) => (p as { type?: string } | null)?.type !== 'file',
+    );
     const storedParts = [
-      ...(userMessage?.parts ?? []),
+      ...clientParts,
       ...usedAttachments.map(
         (a): AttachmentRef => ({
           type: 'file',
