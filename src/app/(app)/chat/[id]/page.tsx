@@ -3,7 +3,7 @@ import { notFound, redirect } from 'next/navigation';
 
 import { ChatView } from '@/components/chat/chat-view';
 import { getCurrentUser } from '@/lib/auth/current-user';
-import { listSelectableModels } from '@/lib/ai/resolve';
+import { defaultModelId, listSelectableModels } from '@/lib/ai/resolve';
 import { db } from '@/lib/db';
 import { conversations, messages } from '@/lib/db/schema';
 
@@ -79,7 +79,7 @@ export default async function ChatPage({ params }: PageProps<'/chat/[id]'>) {
     <ChatView
       conversationId={conversation.id}
       credits={user.credits}
-      initialModelId={conversation.modelId}
+      initialModelId={conversation.modelId ?? defaultModelId(models)}
       initialTurns={visible.map((m) => ({
         id: m.id,
         role: m.role as 'user' | 'assistant',

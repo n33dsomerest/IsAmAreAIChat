@@ -7,6 +7,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db } from '@/lib/db';
 import { providers, providerModels } from '@/lib/db/schema';
 import type { ModelCapabilities } from '@/lib/db/schema';
+import { DEFAULT_MODEL_REMOTE_ID } from '@/lib/ai/model-curation';
 
 export class ProviderConfigError extends Error {
   constructor(message: string) {
@@ -106,6 +107,18 @@ export async function listSelectableModels(): Promise<SelectableModel[]> {
     .innerJoin(providers, eq(providerModels.providerId, providers.id))
     .where(and(eq(providers.enabled, true), eq(providerModels.enabled, true)))
     .orderBy(asc(providers.sortOrder), asc(providerModels.sortOrder));
+}
+
+/**
+ * The model a conversation starts on when none was chosen.
+ *
+ * The picker would otherwise fall back to whatever sorts first, which is an
+ * accident of the catalogue rather than a decision. Falls back to the first
+ * live model so a chat still opens if the curated default is ever switched off.
+ */
+export function defaultModelId(models: SelectableModel[]): string | null {
+  const preferred = models.find((m) => m.remoteModelId === DEFAULT_MODEL_REMOTE_ID);
+  return preferred?.id ?? models[0]?.id ?? null;
 }
 
 type Candidate = SelectableModel & { enabled: true; provider: ProviderRow };

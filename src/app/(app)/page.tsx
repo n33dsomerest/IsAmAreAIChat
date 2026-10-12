@@ -1,6 +1,6 @@
 import { ChatView } from '@/components/chat/chat-view';
 import { getCurrentUser } from '@/lib/auth/current-user';
-import { listSelectableModels } from '@/lib/ai/resolve';
+import { defaultModelId, listSelectableModels } from '@/lib/ai/resolve';
 
 /** Credits and the model catalogue are per-request, so blocking is expected. */
 export const instant = false;
@@ -11,7 +11,7 @@ export default async function HomePage() {
   return (
     <ChatView
       credits={user?.credits ?? 0}
-      initialModelId={null}
+      initialModelId={defaultModelId(models)}
       initialTurns={[]}
       models={models.map((m) => ({
         id: m.id,

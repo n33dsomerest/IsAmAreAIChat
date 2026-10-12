@@ -14,10 +14,17 @@ export const CURATED_OPENROUTER: ReadonlyArray<{ id: string; label: string }> = 
   { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'NVIDIA: Nemotron 3 Ultra' },
   { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA: Nemotron 3 Super' },
   { id: 'nvidia/nemotron-3.5-lightning:free', label: 'NVIDIA: Nemotron 3.5 Lightning' },
-  { id: 'poolside/laguna-s-2.1:free', label: 'Poolside: Laguna S 2.1' },
-  { id: 'thinkingmachines/inkling:free', label: 'Thinking Machines: Inkling' },
   { id: 'cohere/north-mini-code:free', label: 'Cohere: North Mini Code' },
 ];
+
+/**
+ * The model a new chat starts on.
+ *
+ * Auto Router picks a free model per request, so it needs no curation decision
+ * of our own: it is the option that keeps working when the catalogue shifts
+ * underneath us. It is the first entry of the allowlist for the same reason.
+ */
+export const DEFAULT_MODEL_REMOTE_ID = 'openrouter/free';
 
 const CURATED_BY_ID = new Map(CURATED_OPENROUTER.map((m) => [m.id, m.label]));
 
