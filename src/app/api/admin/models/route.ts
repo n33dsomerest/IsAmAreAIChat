@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/api/auth';
 import { setModelEnabled, setModelFallback } from '@/lib/ai/model-visibility';
 import { db } from '@/lib/db';
 import { providerModels, providers } from '@/lib/db/schema';
+import { invalidateCandidateCache } from '@/lib/ai/resolve';
 
 /**
  * Every model in the catalogue, live or not.
@@ -94,5 +95,6 @@ export async function PATCH(request: Request) {
     .from(providerModels)
     .where(eq(providerModels.id, id));
 
+  invalidateCandidateCache();
   return NextResponse.json({ model: row });
 }

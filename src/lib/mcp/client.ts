@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { z } from 'zod';
+import logger from '@/lib/logger';
 
 export type McpServer = {
   id: string;
@@ -80,20 +81,50 @@ export class McpClient {
     return payload?.result;
   }
 
-  /** Tool list, cached briefly so a chat turn does not re-handshake every time. */
+  /** Tool list, cached for 5 min with stale-while-revalidate. */
   async tools(force = false): Promise<McpTool[]> {
-    if (!force && this.#tools && Date.now() - this.#fetchedAt < 60_000) {
+    const now = Date.now();
+    const CACHE_TTL_MS = 5 * 60_000; // 5 minutes
+    const STALE_TTL_MS = 10 * 60_000; // 10 minutes (stale-while-revalidate window)
+
+    // Fresh cache - return immediately
+    if (!force && this.#tools && now - this.#fetchedAt < CACHE_TTL_MS) {
       return this.#tools;
     }
 
-    const result = (await this.#rpc('tools/list')) as { tools?: unknown[] } | undefined;
-    const tools = (result?.tools ?? [])
-      .map((t) => normaliseTool(this.#server, t))
-      .filter(Boolean) as McpTool[];
+    // Stale cache - return immediately, refresh in background
+    if (!force && this.#tools && now - this.#fetchedAt < STALE_TTL_MS) {
+      // Fire-and-forget background refresh
+      this.#refreshTools().catch(() => { /* ignore */ });
+      return this.#tools;
+    }
 
-    this.#tools = tools;
-    this.#fetchedAt = Date.now();
-    return tools;
+    // No cache or too stale - fetch synchronously
+    return this.#refreshTools();
+  }
+
+  /** Internal: fetch tools and update cache. */
+  async #refreshTools(): Promise<McpTool[]> {
+    try {
+      const result = (await this.#rpc('tools/list')) as { tools?: unknown[] } | undefined;
+      const tools = (result?.tools ?? [])
+        .map((t) => normaliseTool(this.#server, t))
+        .filter(Boolean) as McpTool[];
+
+      this.#tools = tools;
+      this.#fetchedAt = Date.now();
+      return tools;
+    } catch (error) {
+      // If refresh fails but we have stale data, keep serving it
+      if (this.#tools) {
+        logger.warn(
+          { server: this.#server.name, error: error instanceof Error ? error.message : String(error) },
+          'MCP tools refresh failed, serving stale tools',
+        );
+        return this.#tools;
+      }
+      throw error;
+    }
   }
 
   async call(name: string, args: Record<string, unknown>): Promise<unknown> {

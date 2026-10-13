@@ -28,6 +28,13 @@ import { ModelPicker, type PickerModel } from '@/components/chat/model-picker';
 import { Markdown } from '@/components/markdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 
 type Part =
@@ -91,6 +98,9 @@ const router = useRouter();
   const [webSearch, setWebSearch] = useState(false);
   const [files, setFiles] = useState<PendingFile[]>([]);
   const [uploading, setUploading] = useState(false);
+  // Edit message modal state (replaces blocking prompt())
+  const [editTurnId, setEditTurnId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
   // Read by the stream callback, which is memoised and must not re-create itself
   // every time a file is added or removed.
   const attachmentIdsRef = useRef<string[]>([]);
@@ -407,13 +417,14 @@ if (event.type === 'reasoning-delta')
   }
 
   return (
-    <div
-      className="relative flex min-h-0 flex-1 flex-col"
-      onDragEnter={onDragEnter}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-    >
+    <>
+      <div
+        className="relative flex min-h-0 flex-1 flex-col"
+        onDragEnter={onDragEnter}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
       {dropping && (
         <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center rounded-xl border-2 border-dashed border-primary bg-primary/5">
           <p className="bg-primary text-primary-foreground rounded-full px-4 py-2 text-sm font-medium shadow-lg">
@@ -474,8 +485,8 @@ if (event.type === 'reasoning-delta')
                           className="size-7"
                           aria-label="แก้ไขข้อความ"
                           onClick={() => {
-                            const next = prompt('แก้ไขข้อความ', textOf(turn.parts));
-                            if (next?.trim()) void forkFrom(turn.id, next.trim());
+                            setEditText(textOf(turn.parts));
+                            setEditTurnId(turn.id);
                           }}
                         >
                           <Pencil className="size-3.5" />
@@ -640,6 +651,39 @@ if (event.type === 'reasoning-delta')
         </div>
       </div>
     </div>
+
+    {/* Edit message modal - replaces blocking prompt() */}
+    <Dialog open={editTurnId !== null} onOpenChange={(open) => !open && setEditTurnId(null)}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>แก้ไขข้อความ</DialogTitle>
+        </DialogHeader>
+        <Textarea
+          value={editText}
+          onChange={(e) => setEditText(e.target.value)}
+          placeholder="พิมพ์ข้อความใหม่…"
+          className="min-h-[120px] resize-none"
+          autoFocus
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setEditTurnId(null)}>
+            ยกเลิก
+          </Button>
+          <Button
+            onClick={() => {
+              if (editText.trim() && editTurnId) {
+                void forkFrom(editTurnId, editText.trim());
+              }
+              setEditTurnId(null);
+            }}
+            disabled={!editText.trim()}
+          >
+            บันทึก
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   );
 }
 

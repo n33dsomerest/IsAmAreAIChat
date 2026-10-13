@@ -15,6 +15,9 @@ class NonRetryableError extends Error {}
 function isRetryable(error: unknown): boolean {
   if (error instanceof NonRetryableError) return false;
 
+  // Client aborted - don't retry, don't count as model failure
+  if (error instanceof Error && error.name === 'AbortError') return false;
+
   const message = error instanceof Error ? error.message : String(error);
   // Bad request from the user, or a model id this gateway does not know.
   if (/\b(400|404|422)\b/.test(message)) return false;
@@ -22,6 +25,11 @@ function isRetryable(error: unknown): boolean {
   if (/content_policy|safety|blocked/i.test(message)) return false;
 
   return true;
+}
+
+/** Check if error is a client abort (not a model failure). */
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === 'AbortError';
 }
 
 export function textOf(messages: UIMessage[]): string {
@@ -106,6 +114,13 @@ export async function generateWithFallback({
       // before we commit to this model, and not three chunks into the response.
       const reader = result.fullStream.getReader();
       const first = await reader.read();
+
+      // Check abort signal BEFORE treating empty response as error.
+      // If client aborted, the stream will be done but we shouldn't retry.
+      if (abortSignal?.aborted) {
+        throw new DOMException('Aborted', 'AbortError');
+      }
+
       if (first.done) {
         // Retryable on purpose. This model produced nothing, but that says
         // nothing about the next one in the chain: `openrouter/free` routes to
@@ -135,6 +150,11 @@ export async function generateWithFallback({
 
       return { stream, winner: candidate, attempts: i + 1, failures };
     } catch (error) {
+      // Client abort - re-throw immediately, don't count as model failure
+      if (isAbortError(error)) {
+        throw error;
+      }
+
       const label = `${candidate.displayName} (${candidate.providerName})`;
       const reason = error instanceof Error ? error.message : String(error);
       failures.push(`${label}: ${reason}`);

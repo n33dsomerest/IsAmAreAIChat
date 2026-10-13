@@ -6,6 +6,7 @@ import { getCurrentUser } from '@/lib/auth/current-user';
 import { defaultModelId, listSelectableModels } from '@/lib/ai/resolve';
 import { db } from '@/lib/db';
 import { conversations, messages } from '@/lib/db/schema';
+import { ChatErrorBoundary } from '@/components/error-boundary';
 
 export const instant = false;
 
@@ -76,26 +77,28 @@ export default async function ChatPage({ params }: PageProps<'/chat/[id]'>) {
   const visible: typeof rows = orphanedRoots.length ? rows : path;
 
   return (
-    <ChatView
-      conversationId={conversation.id}
-      credits={user.credits}
-      initialModelId={conversation.modelId ?? defaultModelId(models)}
-      initialTurns={visible.map((m) => ({
-        id: m.id,
-        role: m.role as 'user' | 'assistant',
-        parts: Array.isArray(m.parts) ? (m.parts as never) : [],
-        branchCount: children.get(m.id)?.length ?? 0,
-      }))}
-      models={models.map((m) => ({
-        id: m.id,
-        label: m.displayName,
-        provider: m.providerName,
-        providerId: m.providerId,
-        isFallback: m.isFallback,
-        contextWindow: m.contextWindow,
-        maxOutput: m.maxOutput,
-        capabilities: m.capabilities,
-      }))}
-    />
+    <ChatErrorBoundary>
+      <ChatView
+        conversationId={conversation.id}
+        credits={user.credits}
+        initialModelId={conversation.modelId ?? defaultModelId(models)}
+        initialTurns={visible.map((m) => ({
+          id: m.id,
+          role: m.role as 'user' | 'assistant',
+          parts: Array.isArray(m.parts) ? (m.parts as never) : [],
+          branchCount: children.get(m.id)?.length ?? 0,
+        }))}
+        models={models.map((m) => ({
+          id: m.id,
+          label: m.displayName,
+          provider: m.providerName,
+          providerId: m.providerId,
+          isFallback: m.isFallback,
+          contextWindow: m.contextWindow,
+          maxOutput: m.maxOutput,
+          capabilities: m.capabilities,
+        }))}
+      />
+    </ChatErrorBoundary>
   );
 }

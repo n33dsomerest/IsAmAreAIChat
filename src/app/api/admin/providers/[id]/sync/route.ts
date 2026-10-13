@@ -6,6 +6,7 @@ import { requireAdmin } from '@/lib/api/auth';
 import { syncProviderModels } from '@/lib/ai/sync-models';
 import { db } from '@/lib/db';
 import { providers } from '@/lib/db/schema';
+import { invalidateCandidateCache } from '@/lib/ai/resolve';
 
 /**
  * Pull the provider's live catalogue into `provider_models`.
@@ -52,6 +53,7 @@ export async function POST(request: NextRequest, context: RouteContext<'/api/adm
     const { applySyncMode } = await import('@/lib/ai/model-visibility');
     const applied = await applySyncMode(id, parsed.data.mode);
 
+    invalidateCandidateCache();
     return NextResponse.json({
       provider: provider.name,
       ...result,

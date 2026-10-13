@@ -147,6 +147,8 @@ export const messages = pgTable(
   (t) => [
     index('messages_conversation_created_idx').on(t.conversationId, t.createdAt),
     index('messages_parent_idx').on(t.parentId),
+    // Composite for branching: find siblings by conversation + parent
+    index('messages_conversation_parent_idx').on(t.conversationId, t.parentId),
   ],
 );
 
@@ -414,6 +416,8 @@ export const usageEvents = pgTable(
     index('usage_events_model_idx').on(t.modelId),
     index('usage_events_status_idx').on(t.status),
     index('usage_events_remote_model_idx').on(t.remoteModelId),
+    // Composite for sweepExpiredUsage: user + status + createdAt
+    index('usage_events_user_status_created_idx').on(t.userId, t.status, t.createdAt),
   ],
 );
 

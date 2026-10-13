@@ -23,6 +23,10 @@ export const EXPIRY_MINUTES = 15;
 
 const BATCH = 50;
 
+/** In-memory timestamp of last successful sweep (process lifetime). */
+let lastSweepAt = 0;
+const SWEEP_INTERVAL_MS = 15 * 60_000; // 15 minutes
+
 export async function sweepExpiredUsage(now = new Date()): Promise<number> {
   const cutoff = new Date(now.getTime() - EXPIRY_MINUTES * 60_000);
 
@@ -45,21 +49,33 @@ export async function sweepExpiredUsage(now = new Date()): Promise<number> {
     if (Array.isArray(result) && result.length) swept += 1;
   }
 
+  if (swept > 0) {
+    lastSweepAt = Date.now();
+  }
+
   return swept;
 }
 
 /**
- * Runs on the way into a chat turn rather than only on a schedule.
- *
- * Vercel's cron on Hobby fires once a day, which is far too coarse for a
- * fifteen minute window, and a sweep nobody triggers is a sweep that quietly
- * stops happening. Doing it here means the cleanup rides along with traffic the
- * app already receives, and the cost is one indexed range scan per turn.
+ * Lightweight check: only runs sweep if >15min since last sweep.
+ * Called on every chat request — cheap indexed range scan.
  */
 export async function sweepIfDue(): Promise<void> {
+  const now = Date.now();
+  if (now - lastSweepAt < SWEEP_INTERVAL_MS) {
+    return; // Skip: sweep ran recently
+  }
   try {
     await sweepExpiredUsage();
   } catch {
     // A failed sweep must never fail a chat. The next request tries again.
   }
+}
+
+/**
+ * Full sweep for Vercel Cron (runs every 5 min).
+ * Ignores the in-memory interval — always attempts to sweep.
+ */
+export async function sweepForCron(): Promise<number> {
+  return sweepExpiredUsage();
 }

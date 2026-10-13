@@ -2,6 +2,7 @@ import { cache } from 'react';
 import { connection } from 'next/server';
 
 import { createClient } from '@/lib/supabase/server';
+import logger from '@/lib/logger';
 
 export type CurrentUser = {
   id: string;
@@ -46,11 +47,14 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   // than "row missing" is a real problem — most often missing table grants,
   // which otherwise looks identical to being signed out and hides the bug.
   if (error) {
-    console.error('[auth] failed to load profile:', error.message, error.code, error.hint);
+    logger.error(
+      { error: { message: error.message, code: error.code, hint: error.hint } },
+      'failed to load profile',
+    );
     return null;
   }
   if (!profile) {
-    console.error('[auth] signed-in user has no profile row:', user.id);
+    logger.error({ userId: user.id }, 'signed-in user has no profile row');
     return null;
   }
 

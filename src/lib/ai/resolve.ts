@@ -50,25 +50,55 @@ function readKey(envKeyName: string): string {
   return key;
 }
 
+/** Memoized provider clients to avoid recreating on every request. */
+const providerClientCache = new Map<string, ReturnType<typeof createAnthropic> | ReturnType<typeof createGoogleGenerativeAI> | ReturnType<typeof createOpenAICompatible>>();
+
+/** Cached candidate with widened `enabled` type for storage. */
+type CachedCandidate = SelectableModel & { enabled: boolean; provider: ProviderRow };
+
+/** In-memory cache for candidate models with TTL (60s). */
+interface CandidateCache {
+  data: CachedCandidate[];
+  expiresAt: number;
+}
+let candidateCache: CandidateCache | null = null;
+const CANDIDATE_CACHE_TTL_MS = 60_000;
+
+/** Invalidate the candidate cache (call when admin changes models/providers). */
+export function invalidateCandidateCache(): void {
+  candidateCache = null;
+}
+
 function chatFactory(provider: ProviderRow) {
+  const cached = providerClientCache.get(provider.id);
+  if (cached) return cached;
+
   const apiKey = readKey(provider.envKeyName);
   const baseURL = provider.baseUrl.replace(/\/+$/, '');
   const headers = provider.headers;
 
+  let client: ReturnType<typeof createAnthropic> | ReturnType<typeof createGoogleGenerativeAI> | ReturnType<typeof createOpenAICompatible>;
+
   switch (provider.kind) {
     case 'anthropic':
-      return createAnthropic({ apiKey, baseURL, headers });
+      client = createAnthropic({ apiKey, baseURL, headers });
+      break;
     case 'google':
-      return createGoogleGenerativeAI({ apiKey, baseURL, headers });
+      client = createGoogleGenerativeAI({ apiKey, baseURL, headers });
+      break;
     case 'openai-compatible':
     default:
-      return createOpenAICompatible({
+      client = createOpenAICompatible({
         name: provider.name,
         apiKey,
         baseURL,
         headers,
       });
+      break;
   }
+
+  providerClientCache.set(provider.id, client);
+  return client;
 }
 
 const SELECTABLE = {
@@ -128,8 +158,14 @@ type Candidate = SelectableModel & { enabled: true; provider: ProviderRow };
  *
  * This is the single source the fallback chain is built from — resolving the
  * provider per model would turn a 16-model chain into 17 round trips.
+ * Cached for 60s to avoid repeated DB hits on every chat request.
  */
 async function listCandidates(): Promise<Candidate[]> {
+  const now = Date.now();
+  if (candidateCache && candidateCache.expiresAt > now) {
+    return candidateCache.data as Candidate[];
+  }
+
   const rows = await db
     .select({
       ...SELECTABLE,
@@ -142,7 +178,7 @@ async function listCandidates(): Promise<Candidate[]> {
     .where(and(eq(providers.enabled, true), eq(providerModels.enabled, true)))
     .orderBy(asc(providers.sortOrder), asc(providerModels.sortOrder));
 
-  return rows.map((r) => ({
+  const candidates = rows.map((r) => ({
     id: r.id,
     displayName: r.displayName,
     remoteModelId: r.remoteModelId,
@@ -152,9 +188,12 @@ async function listCandidates(): Promise<Candidate[]> {
     isFallback: r.isFallback,
     providerId: r.providerId,
     providerName: r.providerName,
-    enabled: true,
+    enabled: true as const,
     provider: r.provider,
   }));
+
+  candidateCache = { data: candidates as CachedCandidate[], expiresAt: now + CANDIDATE_CACHE_TTL_MS };
+  return candidates;
 }
 
 function toModel(row: Candidate): ResolvedModel {

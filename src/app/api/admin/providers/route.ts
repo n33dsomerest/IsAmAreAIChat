@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { requireAdmin } from '@/lib/api/auth';
 import { db } from '@/lib/db';
 import { providers } from '@/lib/db/schema';
+import { invalidateCandidateCache } from '@/lib/ai/resolve';
 
 const KINDS = ['openai-compatible', 'anthropic', 'google'] as const;
 
@@ -73,5 +74,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'provider_name_taken' }, { status: 409 });
   }
 
+  invalidateCandidateCache();
   return NextResponse.json({ provider: row }, { status: 201 });
 }

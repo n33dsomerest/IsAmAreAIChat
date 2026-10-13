@@ -21,6 +21,7 @@ import {
 import { db } from '@/lib/db';
 import { artifacts, attachments, conversations, messages, usageEvents } from '@/lib/db/schema';
 import { download, toBase64 } from '@/lib/storage';
+import logger from '@/lib/logger';
 
 /**
  * Vercel Hobby allows 300s; the previous 60 was our own declaration rather than
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
 
   const parsed = requestSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
+    logger.warn({ issues: parsed.error.issues }, 'invalid chat request');
     return NextResponse.json(
       { error: 'invalid_request', issues: parsed.error.issues },
       { status: 400 },
@@ -123,6 +125,26 @@ export async function POST(request: Request) {
     }
   }
 
+  logger.info(
+    { userId: user.id, modelId, conversationId: conversationIdResolved ?? 'new', messageCount: uiMessages.length },
+    'chat request started',
+  );
+  if (conversationId) {
+    const [owned] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(
+        and(
+          eq(conversations.id, conversationId),
+          eq(conversations.userId, user.id),
+        ),
+      )
+      .limit(1);
+    if (!owned) {
+      return NextResponse.json({ error: 'conversation_not_found' }, { status: 404 });
+    }
+  }
+
   /* ── 2. charge first: no token is produced without a debit ─────────────── */
   // Turns killed at the platform's duration limit never reach their own
   // settle(), so their credits would be held forever. Reclaim any that have
@@ -140,12 +162,15 @@ export async function POST(request: Request) {
 
   const result = (Array.isArray(charged) ? charged[0] : charged) as unknown as CreditRow;
   if (!result?.ok) {
+    logger.warn({ userId: user.id, reason: result?.reason }, 'credit charge denied');
     const denial = DENIAL[result?.reason ?? ''] ?? {
       status: 400,
       message: 'ไม่สามารถใช้เครดิตได้',
     };
     return NextResponse.json({ error: result?.reason ?? 'unknown' }, { status: denial.status });
   }
+
+  logger.info({ userId: user.id, balance: result.balance, usageEventId: result.usage_event_id }, 'credit charged');
 
   const usageEventId = result.usage_event_id!;
   let settled = false;
@@ -387,7 +412,10 @@ export async function POST(request: Request) {
     /* ── 4a. fetch the bytes for files a model could actually read ─────────── */
     // Only binary files need downloading; text was extracted at upload time.
     // The size cap is what stops a 20 MB upload from becoming a 27 MB prompt.
+    // Download in parallel to avoid sequential latency for multi-file uploads.
     const inlineFiles = new Map<string, InlineAttachment>();
+
+    // First pass: add text-extracted files immediately (no download needed)
     for (const a of usedAttachments) {
       if (a.extractedText) {
         inlineFiles.set(a.id, {
@@ -397,23 +425,39 @@ export async function POST(request: Request) {
           mime: a.mime,
           text: a.extractedText,
         });
-        continue;
       }
-      if (a.sizeBytes > MAX_INLINE_BYTES) continue;
+    }
 
-      try {
-        const buffer = await download(a.storagePath, user.id);
-        inlineFiles.set(a.id, {
-          attachmentId: a.id,
-          name: a.fileName ?? 'ไฟล์',
-          kind: a.kind,
-          mime: a.mime,
-          data: toBase64(buffer),
-        });
-      } catch {
-        // A file that cannot be read must not fail the whole message — the
-        // text still goes through and toModelMessages notes the omission.
-        console.error('[chat] attachment unreadable:', a.storagePath);
+    // Second pass: download binary files in parallel
+    const binaryAttachments = usedAttachments.filter(
+      (a) => !a.extractedText && a.sizeBytes <= MAX_INLINE_BYTES,
+    );
+
+    if (binaryAttachments.length > 0) {
+      const downloadResults = await Promise.allSettled(
+        binaryAttachments.map(async (a) => {
+          const buffer = await download(a.storagePath, user.id);
+          return {
+            attachmentId: a.id,
+            name: a.fileName ?? 'ไฟล์',
+            kind: a.kind,
+            mime: a.mime,
+            data: toBase64(buffer),
+          } as InlineAttachment;
+        }),
+      );
+
+      for (const [index, result] of downloadResults.entries()) {
+        if (result.status === 'fulfilled') {
+          inlineFiles.set(binaryAttachments[index].id, result.value);
+        } else {
+          // A file that cannot be read must not fail the whole message — the
+          // text still goes through and toModelMessages notes the omission.
+          logger.warn(
+            { storagePath: binaryAttachments[index].storagePath, error: String(result.reason) },
+            'attachment unreadable',
+          );
+        }
       }
     }
 
@@ -421,6 +465,7 @@ export async function POST(request: Request) {
     // calls, so there is nothing to buffer while streaming; they are split out
     // at `finish`.
     const failures: string[] = [];
+    let attemptCount = 0;
     const result_ = await generateWithFallback({
       chain,
       // The refs have to reach the model as well as the database.
@@ -441,8 +486,14 @@ export async function POST(request: Request) {
       tools,
       files: inlineFiles,
       abortSignal: abortController.signal,
-      onAttemptFailed: (_model, error) => {
-        failures.push(error instanceof Error ? error.message : String(error));
+      onAttemptFailed: (model, error) => {
+        attemptCount++;
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        failures.push(`${model.displayName} (${model.providerName}): ${errorMsg}`);
+        logger.warn(
+          { attempt: attemptCount, model: model.displayName, provider: model.providerName, error: errorMsg },
+          'model attempt failed, falling back',
+        );
       },
     });
 
