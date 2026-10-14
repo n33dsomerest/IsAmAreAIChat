@@ -17,6 +17,7 @@ const SUSPECT = [
   'OKMD_API_KEY',
   'SLIPOK_API_KEY',
   'GOOGLE_CLIENT_SECRET',
+  'CRON_SECRET',
 ];
 
 /** Values are quoted or percent-encoded in some parsers; try both forms. */

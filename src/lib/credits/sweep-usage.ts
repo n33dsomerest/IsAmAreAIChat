@@ -73,8 +73,13 @@ export async function sweepIfDue(): Promise<void> {
 }
 
 /**
- * Full sweep for Vercel Cron (runs every 5 min).
- * Ignores the in-memory interval — always attempts to sweep.
+ * The nightly backstop for Vercel Cron.
+ *
+ * Ignores the in-memory interval and always attempts a sweep. The schedule in
+ * `vercel.json` is daily — the plan this project is on rejects sub-daily cron
+ * expressions — so `sweepIfDue` above is what does the timely work, and this is
+ * only here to catch a user who made a request, lost the credit to a function
+ * that never finished, and then never came back.
  */
 export async function sweepForCron(): Promise<number> {
   return sweepExpiredUsage();
