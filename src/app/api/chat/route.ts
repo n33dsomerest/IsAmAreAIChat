@@ -599,8 +599,8 @@ export async function POST(request: Request) {
               latencyMs: Date.now() - startedAt,
             });
 
-            // ```artifact fences are pulled out here rather than in the browser, so
-            // what gets stored is already split.
+            // ```artifact fences are pulled out here and sent to the browser so the
+            // transcript renders artifacts immediately instead of waiting for a reload.
             const segments = extractArtifacts(answer).segments;
             const partsWithText = segments.map((s) =>
               s.type === 'text'
@@ -616,6 +616,8 @@ export async function POST(request: Request) {
               conversationIdResolved,
               storedUser[0].id,
             );
+
+            controller.enqueue(sse({ type: 'parts', parts: partsWithText }));
 
             controller.enqueue(
               sse({ type: 'finish', model: result_.winner.displayName, provider: result_.winner.providerName }),

@@ -132,20 +132,27 @@ const pathname = usePathname();
   }, []);
 
 const appendTo = useCallback((id: string, part: Part) => {
+    // Artifacts arrive via the 'parts' event; this only handles text/reasoning/files.
+    if (part.type === 'artifact') return;
     setTurns((prev) =>
       prev.map((t) =>
         t.id === id
           ? {
               ...t,
-              // Artifacts are whole objects, never merged — only deltas coalesce.
               parts:
-                part.type === 'artifact'
+                part.type === 'file'
                   ? [...t.parts, part]
-                  : part.type === 'file'
-                    ? [...t.parts, part]
-                    : mergeText(t.parts, part.type, part.text),
+                  : mergeText(t.parts, part.type, part.text),
             }
           : t,
+      ),
+    );
+  }, []);
+
+  const setParts = useCallback((id: string, parts: Part[]) => {
+    setTurns((prev) =>
+      prev.map((t) =>
+        t.id === id ? { ...t, parts } : t,
       ),
     );
   }, []);
@@ -214,10 +221,8 @@ const appendTo = useCallback((id: string, part: Part) => {
             if (!line.startsWith('data: ')) continue;
             const event = JSON.parse(line.slice(6));
             if (event.type === 'text-delta') appendTo(botId, { type: 'text', text: event.text });
-if (event.type === 'reasoning-delta')
-              appendTo(botId, { type: 'reasoning', text: event.text });
-            if (event.type === 'artifact')
-              appendTo(botId, { type: 'artifact', artifact: event.artifact });
+            if (event.type === 'reasoning-delta') appendTo(botId, { type: 'reasoning', text: event.text });
+            if (event.type === 'parts') setParts(botId, event.parts);
             if (event.type === 'error') throw new Error('stream error');
           }
         }
@@ -245,7 +250,7 @@ if (event.type === 'reasoning-delta')
         if (created && pathname === '/') router.replace(`/chat/${created}`);
       }
     },
-    [appendTo, modelId, mutateConversations, pathname, router],
+    [appendTo, setParts, modelId, mutateConversations, pathname, router],
   );
 
   /**

@@ -88,6 +88,24 @@ try {
     `${two.filter((s) => s.type === 'artifact').length}`,
   );
 
+  /* Near-miss fence variants (should still fail gracefully — these assert
+   * the regex does NOT match them, guarding against accidental regression
+   * where the regex loosens). */
+  const singleQuoted = extractArtifacts('```artifact lang=html title=\'t\'\n<p/>\n```');
+  check('single-quoted title is NOT matched', singleQuoted.length === 1 && singleQuoted[0].type === 'text');
+
+  const titleFirst = extractArtifacts('```artifact title="t" lang=html\n<p/>\n```');
+  check('title-before-lang is NOT matched', titleFirst.length === 1 && titleFirst[0].type === 'text');
+
+  const commaLang = extractArtifacts('```artifact lang=html, title="t"\n<p/>\n```');
+  check('comma-after-lang is NOT matched', commaLang.length === 1 && commaLang[0].type === 'text');
+
+  const dottedLang = extractArtifacts('```artifact lang=text/html\n<p/>\n```');
+  check('dotted lang is NOT matched', dottedLang.length === 1 && dottedLang[0].type === 'text');
+
+  const fourBackticks = extractArtifacts('````artifact lang=html\n<p/>\n````');
+  check('four-backtick fence is NOT matched', fourBackticks.length === 1 && fourBackticks[0].type === 'text');
+
   /* End to end ------------------------------------------------------------ */
   const jar = new Map();
   const supabase = clientWithJar(jar);
@@ -125,6 +143,7 @@ try {
   });
 
   let text = '';
+  let partsEvent = null;
   if (chat.body) {
     const reader = chat.body.getReader();
     const decoder = new TextDecoder();
@@ -135,6 +154,7 @@ try {
         if (!line.startsWith('data: ')) continue;
         const e = JSON.parse(line.slice(6));
         if (e.type === 'text-delta') text += e.text;
+        if (e.type === 'parts') partsEvent = e.parts;
       }
     }
   }
@@ -145,6 +165,13 @@ try {
     'the reply contains an artifact fence',
     /```artifact\s+lang=html/.test(text),
     text.match(/```artifact[^\n]*/)?.[0] ?? 'no fence in the reply',
+  );
+
+  check(
+    'SSE "parts" event arrives with artifact parts',
+    Array.isArray(partsEvent) &&
+      partsEvent.some((p) => p && p.type === 'artifact' && p.artifact?.source?.length > 0),
+    partsEvent ? `${partsEvent.length} parts, artifact=${partsEvent.some((p) => p?.type === 'artifact')}` : 'no parts event',
   );
 
   /* It is stored, and listable ------------------------------------------- */

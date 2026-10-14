@@ -2,6 +2,7 @@
 
 import {
   CreditCard,
+  FileCode2,
   LogOut,
   MessageSquarePlus,
   MoreHorizontal,
@@ -100,6 +101,12 @@ export function AppSidebar({
                 <Link href="/pricing">
                   <CreditCard className="size-4" />
                   เติมเครดิต
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/artifacts">
+                  <FileCode2 className="size-4" />
+                  ชิ้นงาน
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
