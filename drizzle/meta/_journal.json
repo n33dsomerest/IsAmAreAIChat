@@ -36,6 +36,13 @@
       "when": 1791873266135,
       "tag": "0004_goofy_donald_blake",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1791963395259,
+      "tag": "0005_daily_credit_refill",
+      "breakpoints": true
     }
   ]
 }

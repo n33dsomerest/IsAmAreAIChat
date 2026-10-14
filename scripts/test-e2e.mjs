@@ -89,7 +89,7 @@ try {
   check('signup created an account', Boolean(createdId), createdId ? `id=${createdId.slice(0, 8)}…` : 'none');
   check(
     'trigger set the profile',
-    row?.username === USER && row?.credits_balance === 10,
+    row?.username === USER && row?.credits_balance === 20,
     `username=${row?.username} credits=${row?.credits_balance}`,
   );
   check('session cookie written by @supabase/ssr', cookie.startsWith('sb-'), cookie.split('=')[0] ?? 'none');

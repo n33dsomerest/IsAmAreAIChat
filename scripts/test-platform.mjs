@@ -119,7 +119,7 @@ try {
   check('it reports provider usage', overviewHtml.includes('การใช้งานตามผู้ให้บริการ'));
   check(
     'it lists the configured providers',
-    overviewHtml.includes('openrouter') && overviewHtml.includes('okmd'),
+    overviewHtml.includes('tokenharbor') && overviewHtml.includes('okmd'),
   );
 
   /* ── i18n ───────────────────────────────────────────────────────────── */

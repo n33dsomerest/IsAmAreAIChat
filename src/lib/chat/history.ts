@@ -1,7 +1,7 @@
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, notExists, sql } from 'drizzle-orm';
 
 import { db } from '@/lib/db';
-import { messages } from '@/lib/db/schema';
+import { conversations, messages } from '@/lib/db/schema';
 import { SITE } from '@/lib/site-config';
 import type { FilePart, ModelMessage, TextPart, UIMessage } from 'ai';
 import type { ModelCapabilities } from '@/lib/db/schema';
@@ -202,6 +202,54 @@ export function deriveTitle(text: string, fallback = 'New chat'): string {
  * so an automatic title can never overwrite a name the user chose.
  */
 export const PLACEHOLDER_TITLES: readonly string[] = ['แชทใหม่', 'New chat'];
+
+/**
+ * The conversation a fresh chat starts in, created only if there isn't one.
+ *
+ * This is what "แชทใหม่" means now: not "make a new row" but "an empty session".
+ * The composer used to insert one per visit to `/` and per file attachment, so
+ * a user who opened the app five times held five `แชทใหม่` rows and no way to
+ * tell them apart. Reusing the newest empty one makes the button idempotent and
+ * caps the strays at one per user.
+ *
+ * Emptiness is tested against `messages`, not against the title: a conversation
+ * can legitimately be empty and renamed by hand, and it is still the session to
+ * stay in. Conversely a row whose title failed to derive still has a first
+ * message and must not be reused as a blank slate.
+ *
+ * Not transactional — two simultaneous first loads can both miss and insert,
+ * leaving one redundant empty row. That is the cheaper failure of the two:
+ * a duplicate empty chat is invisible, whereas serialising the page render on
+ * a write lock is a latency cost on every single chat open.
+ */
+export async function resolveDraftConversation(userId: string): Promise<string> {
+  const [empty] = await db
+    .select({ id: conversations.id })
+    .from(conversations)
+    .where(
+      and(
+        eq(conversations.userId, userId),
+        eq(conversations.archived, false),
+        notExists(
+          db
+            .select({ one: sql`1` })
+            .from(messages)
+            .where(eq(messages.conversationId, conversations.id)),
+        ),
+      ),
+    )
+    .orderBy(desc(conversations.updatedAt))
+    .limit(1);
+
+  if (empty) return empty.id;
+
+  const [created] = await db
+    .insert(conversations)
+    .values({ userId, title: PLACEHOLDER_TITLES[0] })
+    .returning({ id: conversations.id });
+
+  return created.id;
+}
 
 /** The text of a message, ignoring reasoning and other non-text parts. */
 export function textOf(parts: { type?: string; text?: unknown }[] | undefined): string {

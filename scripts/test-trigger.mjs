@@ -47,7 +47,7 @@ try {
   await insertAuthUser(ID.explicit, 'bob@users.aichat.app', { username: 'bob' });
   let p = (await profile(ID.explicit))[0];
   check('uses the chosen username', p?.username === 'bob', `got ${p?.username}`);
-  check('grants welcome credits', p?.credits_balance === 10, `balance=${p?.credits_balance}`);
+  check('grants welcome credits', p?.credits_balance === 20, `balance=${p?.credits_balance}`);
   check('defaults to role=user', p?.role === 'user', `role=${p?.role}`);
 
   // 2. Google sign-in with the same local part must not collide.

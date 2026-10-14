@@ -88,7 +88,7 @@ try {
       select username, role, credits_balance from public.users where id = ${signup.json.id}
     `;
     check('trigger created the profile', profile?.username === USER_A, `username=${profile?.username}`);
-    check('granted welcome credits', profile?.credits_balance === 10, `balance=${profile?.credits_balance}`);
+    check('granted welcome credits', profile?.credits_balance === 20, `balance=${profile?.credits_balance}`);
   }
 
   /* 3 ─ sign in --------------------------------------------------------- */

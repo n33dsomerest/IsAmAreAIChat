@@ -10,6 +10,10 @@ export async function GET() {
   const session = await requireUser();
   if (!session.ok) return session.response;
 
+  const messageCount = sql<number>`(
+    select count(*) from public.messages m where m.conversation_id = ${conversations.id}
+  )::int`;
+
   const rows = await db
     .select({
       id: conversations.id,
@@ -21,16 +25,23 @@ export async function GET() {
       createdAt: conversations.createdAt,
       modelId: conversations.modelId,
       modelName: providerModels.displayName,
-      messageCount: sql<number>`(
-        select count(*) from public.messages m where m.conversation_id = ${conversations.id}
-      )::int`,
+      messageCount,
     })
     .from(conversations)
     .leftJoin(providerModels, eq(conversations.modelId, providerModels.id))
     .where(
       and(eq(conversations.userId, session.user.id), eq(conversations.archived, false)),
     )
-    .orderBy(desc(conversations.pinned), desc(conversations.updatedAt))
+    // An empty session is a permanent fixture now — `/` reuses it instead of
+    // inserting a new one — so it never ages out and would otherwise sit at the
+    // top of the list forever, since a session nobody has spoken in has no
+    // recency of its own. Has-messages first, then most recent: the draft reads
+    // as the thing at the bottom you return to, which is what it is.
+    .orderBy(
+      desc(conversations.pinned),
+      sql`exists (select 1 from public.messages m where m.conversation_id = ${conversations.id}) desc`,
+      desc(conversations.updatedAt),
+    )
     .limit(200);
 
   const folders = [...new Set(rows.map((r) => r.folder).filter(Boolean))] as string[];

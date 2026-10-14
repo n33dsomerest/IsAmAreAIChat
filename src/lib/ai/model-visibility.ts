@@ -1,22 +1,23 @@
 import { and, eq } from 'drizzle-orm';
 
-import { isCuratedOpenRouter } from '@/lib/ai/model-curation';
+import { isCuratedTokenHarbor } from '@/lib/ai/model-curation';
 import { db } from '@/lib/db';
 import { providerModels } from '@/lib/db/schema';
 import { isFreeModelId } from '@/lib/ai/sync-models';
 
 export type SyncMode = 'free' | 'all' | 'none';
 
-/** Stable id of the OpenRouter provider row, as seeded by the sync script. */
-const OPENROUTER_PROVIDER_ID = 'openrouter';
+/** Stable id of the TokenHarbor provider row, as seeded by the sync script. */
+const TOKENHARBOR_PROVIDER_ID = 'tokenharbor';
 
 /**
- * OpenRouter offers several hundred no-cost variants, so "enable everything
- * free" is not a usable default — it puts a wall of models nobody chose in the
- * picker. The curated allowlist is the editorial answer.
+ * TokenHarbor lists a paid twin for every free model, so "enable everything
+ * free" is not just a cluttered picker — it is one admin click away from billing
+ * real money. The curated allowlist is the editorial answer, and it is also the
+ * safety answer: a model id that is not on the list never reaches `enabled`.
  */
 function defaultEnabled(providerId: string, remoteModelId: string): boolean {
-  if (providerId === OPENROUTER_PROVIDER_ID) return isCuratedOpenRouter(remoteModelId);
+  if (providerId === TOKENHARBOR_PROVIDER_ID) return isCuratedTokenHarbor(remoteModelId);
   return isFreeModelId(remoteModelId);
 }
 

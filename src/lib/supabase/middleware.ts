@@ -10,6 +10,11 @@ const PUBLIC_PATHS = [
   '/pricing',
   '/api/payments',
   '/api/webhooks',
+  // Cron hits carry no Supabase cookie, so gating them here answered 401 before
+  // the route ever ran and the CRON_SECRET check inside it was unreachable.
+  // Each route under here does its own `Bearer` comparison and fails closed when
+  // CRON_SECRET is unset — this list says "no session", not "no authentication".
+  '/api/cron',
 ];
 
 /**

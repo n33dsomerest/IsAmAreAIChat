@@ -62,7 +62,7 @@ try {
   const before = (
     await sql`select credits_balance from public.users where id = ${createdId}`
   )[0].credits_balance;
-  check('fixture starts with credits', before === 10, `${before} credits`);
+  check('fixture starts with credits', before === 20, `${before} credits`);
 
   /* Catalogue ---------------------------------------------------------- */
   const cat = await fetch(`${APP}/api/models`, { headers: { cookie } });

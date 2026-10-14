@@ -68,7 +68,7 @@ try {
     select p.proname
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname in
-      ('consume_credit','refund_credit','complete_usage','grant_order_credits','daily_quota_for')
+      ('consume_credit','refund_credit','complete_usage','grant_order_credits','daily_quota_for','grant_daily_credits')
     order by p.proname
   `;
   console.log(`✓ credit functions: ${fns.map((f) => f.proname).join(', ') || '(none)'}`);

@@ -14,7 +14,7 @@ import {
   WifiOff,
   X,
 } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { toast } from 'sonner';
 
@@ -79,6 +79,7 @@ export function ChatView({
   initialTurns: Turn[];
 }) {
 const router = useRouter();
+const pathname = usePathname();
   const idPrefix = useId();
   const seqRef = useRef(0);
   // Turn ids only need to be unique within this component instance. A clock
@@ -160,6 +161,12 @@ const appendTo = useCallback((id: string, part: Part) => {
       const controller = new AbortController();
       abortRef.current = controller;
 
+      // Read here, navigated in `finally`: the URL must not change until the
+      // exchange is finished, because `/chat/[id]` is a server component that
+      // remounts this one from its own snapshot. Jumping there mid-stream threw
+      // away the half-streamed reply and made the user resend the message.
+      let created: string | null = null;
+
       try {
         const res = await fetch('/api/chat', {
           method: 'POST',
@@ -184,12 +191,14 @@ const appendTo = useCallback((id: string, part: Part) => {
             kind: res.status === 402 || res.status === 429 ? 'offline' : 'error',
             message: err.message ?? err.error ?? `เรียก API ไม่สำเร็จ (${res.status})`,
           });
+          // No conversation id on a rejected request, and none was persisted
+          // either — the credits check runs before the first message is written.
+          // Staying put keeps the empty session reusable, which is the point.
           return;
         }
 
-        // A brand-new conversation was created server side — follow it.
-        const created = res.headers.get('x-conversation-id');
-        if (!targetConversationId && created) router.replace(`/chat/${created}`);
+        // A conversation may have been created server side — follow it below.
+        created = res.headers.get('x-conversation-id');
 
         const named = res.headers.get('x-model-name');
         if (named) setStatus({ kind: 'streaming', model: named });
@@ -226,15 +235,27 @@ if (event.type === 'reasoning-delta')
         });
       } finally {
         abortRef.current = null;
+        // Reached on success and on failure alike: a half-failed exchange still
+        // wrote the user's turn, and leaving them on `/` would strand it on a
+        // session that reloads as empty. Both turns are in the database by now,
+        // so the page this lands on renders exactly what is on screen.
+        //
+        // The test is the path, not the id: a draft on `/` already has a
+        // conversation behind it and this is the moment it earns a URL.
+        if (created && pathname === '/') router.replace(`/chat/${created}`);
       }
     },
-    [appendTo, modelId, mutateConversations, router],
+    [appendTo, modelId, mutateConversations, pathname, router],
   );
 
   /**
-   * A conversation is what attachments hang off, and a brand-new chat has none.
-   * `send` creates one on demand; uploads need the same, otherwise attaching a
-   * file is impossible until after the first message.
+   * A conversation is what attachments hang off, and `POST /api/attachments`
+   * 404s without one.
+   *
+   * `/` always resolves a draft server side, so in practice this returns on the
+   * first line. The insert is kept as the fallback for a caller that renders
+   * `ChatView` without one; note it deliberately does not navigate — the URL
+   * belongs to `stream`, which knows when the conversation has earned it.
    */
   const ensureConversation = useCallback(async (): Promise<string | null> => {
     if (conversationId) return conversationId;
@@ -244,10 +265,8 @@ if (event.type === 'reasoning-delta')
       setStatus({ kind: 'error', message: 'สร้างสนทนาไม่สำเร็จ' });
       return null;
     }
-    const id = (await res.json()).id as string;
-    router.replace(`/chat/${id}`);
-    return id;
-  }, [conversationId, router]);
+    return (await res.json()).id as string;
+  }, [conversationId]);
 
   const send = useCallback(async () => {
     const text = input.trim();

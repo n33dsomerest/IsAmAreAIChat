@@ -77,6 +77,16 @@ export const users = pgTable(
     status: userStatus('status').notNull().default('active'),
 
     creditsBalance: integer('credits_balance').notNull().default(0),
+    /**
+     * UTC date of the last daily refill, `YYYY-MM-DD`.
+     *
+     * The refill is already safe to run twice — it only ever raises a balance
+     * that sits below its threshold — so this column is not what stops a double
+     * grant. What it stops is the opposite: a user who dips below the threshold
+     * at 09:00 being topped up again on a retry at 17:30 the same day. One
+     * refill per day, recorded by name rather than inferred from the ledger.
+     */
+    lastRefillDay: text('last_refill_day'),
     totalPaidThb: numeric('total_paid_thb', { precision: 12, scale: 2 })
       .notNull()
       .default('0'),
@@ -92,6 +102,9 @@ export const users = pgTable(
     uniqueIndex('users_username_key').on(sql`lower(${t.username})`),
     uniqueIndex('users_email_key').on(sql`lower(${t.email})`),
     index('users_first_paid_at_idx').on(t.firstPaidAt),
+    // The nightly refill scans for "not refilled yet". Without this it is a
+    // sequential scan of every user on every run.
+    index('users_last_refill_day_idx').on(t.lastRefillDay),
   ],
 );
 

@@ -23,19 +23,20 @@ const SQL = postgres(process.env.DATABASE_URL, { max: 1, prepare: false });
  *   all    everything the provider listed
  *   none   discover only, enable nothing
  *
- * Kept per provider because the two are genuinely different: OpenRouter exposes
- * 458 models of which 16 are free, while OKMD is a university gateway where
+ * Kept per provider because the two are genuinely different: TokenHarbor lists a
+ * paid twin for every free model, so `free` is the mode that keeps a wide
+ * catalogue from turning into a bill, while OKMD is a university gateway where
  * every model is usable, so all of them are enabled.
  */
 const MODES = new Set(['free', 'all', 'none']);
 
 const PROVIDERS = [
   {
-    name: 'openrouter',
-    display: 'OpenRouter',
+    name: 'tokenharbor',
+    display: 'TokenHarbor',
     kind: 'openai-compatible',
-    baseUrl: 'https://openrouter.ai/api/v1',
-    envKeyName: 'OPENROUTER_API_KEY',
+    baseUrl: 'https://tokenharbor.ai/v1',
+    envKeyName: 'TOKENHARBOR_API_KEY',
     sortOrder: 1,
     mode: 'free',
   },
@@ -64,21 +65,21 @@ function modeFor(provider) {
 }
 
 /** Minimal port of src/lib/ai/sync-models.ts — this script runs outside Next. */
-import { curatedLabel, hasKnownVision, isCuratedOpenRouter } from '../src/lib/ai/model-curation.ts';
+import { curatedLabel, hasKnownVision, isCuratedTokenHarbor } from '../src/lib/ai/model-curation.ts';
 
 function num(v) {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) ? n : null;
 }
 
-const isFree = (id) => id.endsWith(':free') || id === 'openrouter/free';
+const isFree = (id) => id.endsWith(':free');
 
 /**
- * Mirrors `defaultEnabled` in src/lib/ai/model-visibility.ts. OpenRouter is
+ * Mirrors `defaultEnabled` in src/lib/ai/model-visibility.ts. TokenHarbor is
  * curated to a chosen few; other providers fall back to "everything free".
  */
 function defaultEnabled(providerName, remoteModelId) {
-  if (providerName === 'openrouter') return isCuratedOpenRouter(remoteModelId);
+  if (providerName === 'tokenharbor') return isCuratedTokenHarbor(remoteModelId);
   return isFree(remoteModelId);
 }
 
@@ -99,30 +100,49 @@ function normalize(raw, providerName) {
   const modalities = Array.isArray(raw.architecture?.input_modalities)
     ? raw.architecture.input_modalities
     : [];
+  const declared = raw.capabilities ?? {};
   const p = raw.pricing ?? {};
+  // TokenHarbor publishes USD per 1M already; OpenRouter-style gateways publish
+  // per token. Keeping both paths here is what stops the price column from
+  // silently blanking when the gateway's key names differ.
   const perM = (v) => {
     const n = num(v);
     return n === null ? undefined : Math.round(n * 1_000_000 * 1e6) / 1e6;
   };
   const measuredVision = hasKnownVision(providerName, id);
+  const bool = (v) => (typeof v === 'boolean' ? v : null);
 
   return {
     remoteModelId: id,
-    displayName: curatedLabel(id, typeof raw.name === 'string' && raw.name ? raw.name : humanize(id)),
+    displayName: curatedLabel(
+      id,
+      typeof raw.name === 'string' && raw.name
+        ? raw.name
+        : typeof raw.label === 'string' && raw.label
+          ? raw.label
+          : humanize(id),
+    ),
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
     maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
     capabilities: {
-      vision: modalities.includes('image') || measuredVision,
-      tools: params.includes('tools') || params.includes('tool_choice'),
-      reasoning: params.includes('reasoning') || params.includes('include_reasoning'),
-      json: params.includes('response_format') || params.includes('structured_outputs'),
-      pdf: modalities.includes('file'),
+      vision: modalities.includes('image') || bool(declared.vision) === true || measuredVision,
+      tools:
+        bool(declared.tools) ??
+        bool(raw.tool_call) ??
+        bool(raw.function_call) ??
+        (params.includes('tools') || params.includes('tool_choice')),
+      reasoning:
+        bool(declared.reasoning) ?? (params.includes('reasoning') || params.includes('include_reasoning')),
+      json:
+        bool(declared.json) ??
+        (params.includes('response_format') || params.includes('structured_outputs')),
+      pdf: bool(declared.pdf) ?? modalities.includes('file'),
     },
     pricing: {
-      input: perM(p.prompt ?? p.input),
-      output: perM(p.completion ?? p.output),
-      cacheRead: perM(p.input_cache_read),
-      cacheWrite: perM(p.input_cache_write),
+      input: num(p.input_usd_per_1m) ?? perM(p.prompt ?? p.input),
+      output: num(p.output_usd_per_1m) ?? perM(p.completion ?? p.output),
+      cacheRead: perM(p.input_cache_read ?? p.cache_read),
+      cacheWrite: perM(p.input_cache_write ?? p.cache_write),
       currency: 'USD',
     },
   };

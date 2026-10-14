@@ -384,9 +384,10 @@ export async function POST(request: Request) {
     }
 
     /* ── 3c. name the conversation after its first prompt ─────────────────── */
-    // The client creates the conversation up front so uploads have something to
-    // hang off, which leaves every chat titled "แชทใหม่" forever. Naming it here
-    // costs nothing extra — the first user turn is already in hand.
+    // Every chat arrives here already existing and holding "แชทใหม่": `/` resolves
+    // a draft up front so attachments have something to hang off, and this route
+    // is what turns that draft into a named conversation. Naming it here costs
+    // nothing extra — the first user turn is already in hand.
     //
     // The title predicate is the whole safety of this: it only fires while the
     // row still holds a placeholder, so a name the user typed through PATCH is

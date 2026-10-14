@@ -122,8 +122,16 @@ export function AppSidebar({
       </div>
 
       <div className="px-3 pb-2">
+        {/*
+          No `onClick` router.push on top of the `href`. The link alone is what
+          makes the button mean "an empty session": `/` resolves the newest empty
+          conversation server side, so pressing it inside an empty chat is a
+          no-op that stays put, and pressing it inside a chat with history lands
+          on a fresh one. A forced `push` alongside the link fought the link and
+          could re-render the page a second time.
+        */}
         <Button asChild className="w-full justify-start gap-2">
-          <Link href="/" onClick={() => router.push('/')}>
+          <Link href="/">
             <MessageSquarePlus className="size-4" />
             แชทใหม่
           </Link>

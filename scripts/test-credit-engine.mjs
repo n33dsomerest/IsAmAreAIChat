@@ -81,15 +81,15 @@ try {
   check('trigger creates profile on signup', Boolean(u), u ? `username=${u.username}` : 'row missing');
   check(
     'welcome credits granted',
-    u?.credits_balance === 10,
-    `balance=${u?.credits_balance} (expected 10)`,
+    u?.credits_balance === 20,
+    `balance=${u?.credits_balance} (expected 20)`,
   );
 
   /* 2 ─ consume_credit ------------------------------------------------- */
   const r1 = await tx`select * from public.consume_credit(${TEST_UUID}, null, null, ${today})`;
   const [after1] = await tx`select credits_balance from public.users where id = ${TEST_UUID}`;
   check('consume_credit succeeds', r1[0].ok === true, `reason=${r1[0].reason}`);
-  check('balance debited by 1', after1.credits_balance === 9, `balance=${after1.credits_balance}`);
+  check('balance debited by 1', after1.credits_balance === 19, `balance=${after1.credits_balance}`);
 
   const [ev] = await tx`select status, credits_cost from public.usage_events where id = ${r1[0].usage_event_id}`;
   check('usage event created as pending', ev?.status === 'pending' && ev?.credits_cost === 1);
@@ -108,7 +108,7 @@ try {
   const [afterRefund] = await tx`select credits_balance from public.users where id = ${TEST_UUID}`;
   const [evAfter] = await tx`select status from public.usage_events where id = ${r1[0].usage_event_id}`;
   const [{ used: usedAfter }] = await tx`select requests_used as used from public.rate_limits where user_id = ${TEST_UUID} and day = ${today}`;
-  check('refund_credit returns the credit', refunded[0].ok === true && afterRefund.credits_balance === 10);
+  check('refund_credit returns the credit', refunded[0].ok === true && afterRefund.credits_balance === 20);
   check('usage event flipped to refunded', evAfter.status === 'refunded');
   check('daily slot returned', usedAfter === 0, `used=${usedAfter}`);
 
@@ -121,7 +121,7 @@ try {
 
   check(
     'exactly 10 requests allowed (trial quota)',
-    drained.credits_balance === 0 && finalUsed === 10,
+    drained.credits_balance === 10 && finalUsed === 10,
     `balance=${drained.credits_balance}, used=${finalUsed}`,
   );
 
@@ -149,8 +149,10 @@ try {
   check('first grant succeeds', g1[0].ok === true);
   check('second grant is a no-op', g2[0].ok === false);
   check(
+    // 10 left from the drained trial balance + the 35-credit Starter pack. The
+    // residue matters: a pack adds to the balance, it does not replace it.
     'credits added exactly once',
-    paidUser.credits_balance === 35 && paidUser.total_granted === 35,
+    paidUser.credits_balance === 45 && paidUser.total_granted === 35,
     `balance=${paidUser.credits_balance}, granted=${paidUser.total_granted}`,
   );
   check('total_paid_thb recorded', Number(paidUser.total_paid_thb) === 29, `paid=${paidUser.total_paid_thb}`);

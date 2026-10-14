@@ -18,13 +18,15 @@ export type RemoteModel = {
 type ProviderRow = typeof providers.$inferSelect;
 
 /**
- * OpenRouter is the reference shape. Other OpenAI-compatible gateways vary, so
+ * TokenHarbor is the reference shape. Other OpenAI-compatible gateways vary, so
  * every field is read defensively and anything unrecognised is simply absent
  * rather than fatal.
  */
 type RawModel = {
   id?: unknown;
   name?: unknown;
+  /** TokenHarbor's display name, where OpenRouter uses `name`. */
+  label?: unknown;
   context_length?: unknown;
   context_window?: unknown;
   max_tokens?: unknown;
@@ -32,6 +34,9 @@ type RawModel = {
   supported_parameters?: unknown;
   architecture?: { input_modalities?: unknown; modality?: unknown };
   capabilities?: Record<string, unknown>;
+  /** TokenHarbor advertises tool support as a boolean, not a parameter list. */
+  tool_call?: unknown;
+  function_call?: unknown;
   top_provider?: { max_completion_tokens?: unknown };
 };
 
@@ -43,8 +48,14 @@ const num = (v: unknown): number | null => {
 const str = (v: unknown): string | null =>
   typeof v === 'string' && v.length ? v : null;
 
-/** `:free` suffixed ids are OpenRouter's no-cost variants. */
-export const isFreeModelId = (id: string) => id.endsWith(':free') || id === 'openrouter/free';
+/**
+ * `:free` suffixed ids are the no-cost variants.
+ *
+ * The suffix is the only thing standing between a free request and a billed one:
+ * TokenHarbor serves the paid twin of every free model under the same name minus
+ * `:free`, so a fallback chain that widens the search too far will spend money.
+ */
+export const isFreeModelId = (id: string) => id.endsWith(':free');
 
 function deriveCapabilities(raw: RawModel): ModelCapabilities {
   const params = Array.isArray(raw.supported_parameters)
@@ -56,7 +67,7 @@ function deriveCapabilities(raw: RawModel): ModelCapabilities {
     ? (raw.architecture.input_modalities as string[])
     : [];
 
-  return {
+return {
     vision:
       typeof declared.vision === 'boolean'
         ? declared.vision
@@ -64,7 +75,11 @@ function deriveCapabilities(raw: RawModel): ModelCapabilities {
     tools:
       typeof declared.tools === 'boolean'
         ? declared.tools
-        : params.includes('tools') || params.includes('tool_choice'),
+        : typeof raw.tool_call === 'boolean'
+          ? raw.tool_call
+          : typeof raw.function_call === 'boolean'
+            ? raw.function_call
+            : params.includes('tools') || params.includes('tool_choice'),
     reasoning:
       typeof declared.reasoning === 'boolean'
         ? declared.reasoning
@@ -78,21 +93,26 @@ function deriveCapabilities(raw: RawModel): ModelCapabilities {
 }
 
 /**
- * OpenRouter reports USD per token; we store USD per 1M tokens because those
- * are the numbers humans compare.
+ * Normalised to USD per 1M tokens, because those are the numbers humans compare.
+ *
+ * TokenHarbor already publishes `*_usd_per_1m` and passes straight through;
+ * OpenRouter-style gateways publish a per-token `prompt`/`completion` and need
+ * the x1M. Reading only the per-token keys is what silently blanks the price
+ * column for a gateway that never used them.
  */
 function derivePricing(raw: RawModel): ModelPricing {
   const p = raw.pricing ?? {};
-  const perToken = (v: unknown) => {
+  const perTokenToPerMillion = (v: unknown) => {
     const n = num(v);
     return n === null ? undefined : Math.round(n * 1_000_000 * 1e6) / 1e6;
   };
+  const perMillion = (v: unknown) => num(v) ?? undefined;
 
   return {
-    input: perToken(p.prompt ?? p.input),
-    output: perToken(p.completion ?? p.output),
-    cacheRead: perToken(p.input_cache_read),
-    cacheWrite: perToken(p.input_cache_write),
+    input: perMillion(p.input_usd_per_1m) ?? perTokenToPerMillion(p.prompt ?? p.input),
+    output: perMillion(p.output_usd_per_1m) ?? perTokenToPerMillion(p.completion ?? p.output),
+    cacheRead: perTokenToPerMillion(p.input_cache_read ?? p.cache_read),
+    cacheWrite: perTokenToPerMillion(p.input_cache_write ?? p.cache_write),
     currency: 'USD',
   };
 }
@@ -119,17 +139,17 @@ export function normalizeModel(raw: RawModel, providerSlug?: string): RemoteMode
   // claims has to be corrected by measurement for the ones we have measured.
   const measuredVision = providerSlug ? hasKnownVision(providerSlug, id) : false;
 
-  return {
+return {
     remoteModelId: id,
     // Passing the id as the fallback name looks harmless and is not: it is how
     // a curated model loses its curated name the moment the upstream catalogue
-    // omits `name` for it, which it already does for the router. The label then
-    // reads `nvidia/nemotron-3-super-120b-a12b:free` in the picker instead of
-    // the name someone chose, with nothing in the diff to explain it.
-    displayName: curatedLabel(id, str(raw.name) ?? humanize(id)),
+    // omits its display name for it. The label then reads `mimo-v2.6-flash:free`
+    // in the picker instead of the name someone chose, with nothing in the diff
+    // to explain it.
+    displayName: curatedLabel(id, str(raw.name) ?? str(raw.label) ?? humanize(id)),
     contextWindow: num(raw.context_length) ?? num(raw.context_window),
-    // `max_tokens` is OpenRouter's per-model ceiling; some gateways only report
-    // it per upstream provider, hence the second source.
+    // `max_tokens` is a per-model ceiling; some gateways only report it per
+    // upstream provider, hence the second source.
     maxOutput: num(raw.max_tokens) ?? num(raw.top_provider?.max_completion_tokens),
     capabilities: measuredVision
       ? { ...deriveCapabilities(raw), vision: true }

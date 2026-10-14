@@ -14,7 +14,7 @@ const createSchema = z.object({
   kind: z.enum(KINDS),
   baseUrl: z.string().url(),
   /** Name of a server env var — the key itself is never accepted here. */
-  envKeyName: z.string().trim().regex(/^[A-Z][A-Z0-9_]*$/, 'must be an env var name like OPENROUTER_API_KEY'),
+  envKeyName: z.string().trim().regex(/^[A-Z][A-Z0-9_]*$/, 'must be an env var name like TOKENHARBOR_API_KEY'),
   headers: z.record(z.string(), z.string()).default({}),
   enabled: z.boolean().default(true),
   sortOrder: z.number().int().min(0).max(999).default(0),

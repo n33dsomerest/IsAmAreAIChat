@@ -49,14 +49,25 @@ export const formatBaht = (amount: number) =>
   }).format(amount);
 
 export const FREE_TIER = {
-  /** Credits granted once, at signup. */
-  welcomeCredits: 10,
+  /** Credits granted once, at signup — the same number the first daily refill tops up to. */
+  welcomeCredits: 20,
   /** Days at the higher trial quota. */
   trialDays: 3,
   /** Requests/day during the trial. */
   dailyQuota: 10,
   /** Requests/day once the trial is over — lifted permanently on first purchase. */
   dailyQuotaAfterTrial: 5,
+  /**
+   * Credit balance every account is topped up to once a day.
+   *
+   * A different clock from the quotas above: the request cap counts messages,
+   * this counts the balance, and the two are allowed to disagree.
+   */
+  dailyRefillCredits: 20,
+  /** Days from signup during which the higher refill applies. */
+  dailyRefillDays: 7,
+  /** Balance to fall back to once the refill window has passed. */
+  dailyRefillCreditsAfter: 10,
 } as const;
 
 export const SITE = {

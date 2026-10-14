@@ -1,8 +1,9 @@
 /**
  * Proves an uploaded attachment travels all the way to the model.
  *
- * OKMD is used explicitly: OpenRouter's free tier returns 429 once the day's
- * quota is gone, and this is about our plumbing, not about which provider is up.
+ * OKMD is used explicitly: TokenHarbor's free routes draw on a rolling
+ * seven-day allowance, and this is about our plumbing, not about which provider
+ * has quota left.
  */
 import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
@@ -45,10 +46,8 @@ try {
   const vision = (cat.models ?? []).filter((m) => m.capabilities?.vision);
   check('a vision-capable model is available', vision.length > 0, vision.map((m) => m.label).join(', '));
   // Not every model that *claims* vision will pass the image through, and the
-  // two OpenRouter entries are unreliable for this: Inkling refuses the API
-  // outright (403), and Auto Router sends the request to whichever free model
-  // happens to be available, which may have no vision at all. A named OKMD
-  // model is the only choice here that actually asserts "I looked at it".
+  // curated TokenHarbor entries are all text-only, so a named OKMD model is the
+  // only choice here that actually asserts "I looked at it".
   const model = vision.find((m) => m.provider === 'okmd') ?? vision[0];
 
   const conversationId = (

@@ -123,11 +123,10 @@ export async function generateWithFallback({
 
       if (first.done) {
         // Retryable on purpose. This model produced nothing, but that says
-        // nothing about the next one in the chain: `openrouter/free` routes to
-        // whichever free model is free at that moment, and a reasoning-heavy one
-        // can spend the whole token budget thinking and never emit a token.
-        // Treating it as fatal meant one unlucky router ended the request even
-        // though a perfectly good model was sitting further down the list.
+        // nothing about the next one in the chain: a reasoning-heavy model can
+        // spend the whole token budget thinking and never emit a token.
+        // Treating it as fatal meant one unlucky model ended the request even
+        // though a perfectly good one was sitting further down the list.
         throw new Error('The model returned an empty response.');
       }
 

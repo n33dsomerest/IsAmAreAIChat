@@ -13,7 +13,7 @@ import { existsSync, readFileSync } from 'node:fs';
 const SUSPECT = [
   'DATABASE_URL',
   'SUPABASE_SERVICE_ROLE_KEY',
-  'OPENROUTER_API_KEY',
+  'TOKENHARBOR_API_KEY',
   'OKMD_API_KEY',
   'SLIPOK_API_KEY',
   'GOOGLE_CLIENT_SECRET',

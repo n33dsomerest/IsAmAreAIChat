@@ -1,32 +1,31 @@
 /**
- * The OpenRouter models this product actually offers.
+ * The TokenHarbor models this product actually offers.
  *
- * The upstream catalogue exposes several hundred entries, so `free` mode alone
- * would leave the picker full of models nobody chose. This allowlist is the
- * editorial decision, kept in code so a re-sync cannot quietly undo it.
+ * The upstream catalogue exposes 69 entries, only 5 of which are no-cost, so
+ * `free` mode alone would still leave two models nobody chose in the picker.
+ * This allowlist is the editorial decision, kept in code so a re-sync cannot
+ * quietly undo it.
  *
- * Every id here is a `:free` variant — the context windows below are the ones
- * those variants actually report, which is why they differ from the paid twins
- * (`nemotron-3-ultra` is 262k paid but 1M free, for example).
+ * Every id here is a `:free` variant. TokenHarbor suffixes those and publishes a
+ * paid twin alongside each one, so dropping the suffix silently spends real
+ * money — the paid route answers 402 `balance_zero` instead of failing loudly.
  */
-export const CURATED_OPENROUTER: ReadonlyArray<{ id: string; label: string }> = [
-  { id: 'openrouter/free', label: 'Auto Router' },
-  { id: 'nvidia/nemotron-3-ultra-550b-a55b:free', label: 'NVIDIA: Nemotron 3 Ultra' },
-  { id: 'nvidia/nemotron-3-super-120b-a12b:free', label: 'NVIDIA: Nemotron 3 Super' },
-  { id: 'nvidia/nemotron-3.5-lightning:free', label: 'NVIDIA: Nemotron 3.5 Lightning' },
-  { id: 'cohere/north-mini-code:free', label: 'Cohere: North Mini Code' },
+export const CURATED_TOKENHARBOR: ReadonlyArray<{ id: string; label: string }> = [
+  { id: 'mimo-v2.6-flash:free', label: 'MiMo V2.6 Flash (Free)' },
+  { id: 'claude-haiku-5.5:free', label: 'Claude Haiku 5.5 (Free)' },
+  { id: 'deepseek-v4-flash:free', label: 'DeepSeek V4 Flash (Free)' },
 ];
 
 /**
  * The model a new chat starts on.
  *
- * Auto Router picks a free model per request, so it needs no curation decision
- * of our own: it is the option that keeps working when the catalogue shifts
- * underneath us. It is the first entry of the allowlist for the same reason.
+ * MiMo V2.6 Flash is the cheapest of the three on TokenHarbor's own numbers and
+ * it is the one that answers without a reasoning preamble, so it is the model a
+ * user meets first without having to think about which one to pick.
  */
-export const DEFAULT_MODEL_REMOTE_ID = 'openrouter/free';
+export const DEFAULT_MODEL_REMOTE_ID = 'mimo-v2.6-flash:free';
 
-const CURATED_BY_ID = new Map(CURATED_OPENROUTER.map((m) => [m.id, m.label]));
+const CURATED_BY_ID = new Map(CURATED_TOKENHARBOR.map((m) => [m.id, m.label]));
 
 /**
  * The OKMD models that actually read an image.
@@ -61,17 +60,17 @@ export function hasKnownVision(providerSlug: string, remoteModelId: string): boo
 }
 
 /** True when this id is one of the models we deliberately offer. */
-export function isCuratedOpenRouter(id: string): boolean {
+export function isCuratedTokenHarbor(id: string): boolean {
   return CURATED_BY_ID.has(id);
 }
 
 /**
  * The label to show in the picker.
  *
- * OpenRouter appends "(free)" to every no-cost model and names the router
- * "Free Models Router". The price is already implied by the tier, so the word
- * is noise in the UI — and an explicit rename is how `openrouter/free` becomes
- * "Auto Router".
+ * TokenHarbor ships a marketing label ("MiMo V2.6 Flash (Free)") that already
+ * reads well, but the parenthetical duplicates what the provider grouping in the
+ * picker already says — so the suffix is stripped from everything that is not
+ * explicitly curated below, and curated entries keep their hand-written name.
  */
 export function curatedLabel(remoteModelId: string, upstreamName: string): string {
   const override = CURATED_BY_ID.get(remoteModelId);

@@ -88,7 +88,7 @@ try {
   const start = (
     await sql`select credits_balance from public.users where id = ${createdId}`
   )[0].credits_balance;
-  check('fixture starts with welcome credits', start === 10, `${start} credits`);
+  check('fixture starts with welcome credits', start === 20, `${start} credits`);
 
   /* Auth gate ----------------------------------------------------------- */
   const anonOrders = await json('/api/payments/orders');
